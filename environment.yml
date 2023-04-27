@@ -1,4 +1,4 @@
-name: reef_sensing
+name: ShallowLearn
 channels:
   - defaults
 dependencies:
