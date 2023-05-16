@@ -1,0 +1,7 @@
+*.pyc
+.coverage
+.venv/
+.vscode/
+Data/*
+Models/*
+creds

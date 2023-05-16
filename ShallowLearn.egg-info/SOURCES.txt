@@ -1,0 +1,12 @@
+LICENSE
+README.md
+setup.py
+ShallowLearn/LoadData.py
+ShallowLearn/Training.py
+ShallowLearn/__init__.py
+ShallowLearn/api_download.py
+ShallowLearn.egg-info/PKG-INFO
+ShallowLearn.egg-info/SOURCES.txt
+ShallowLearn.egg-info/dependency_links.txt
+ShallowLearn.egg-info/requires.txt
+ShallowLearn.egg-info/top_level.txt

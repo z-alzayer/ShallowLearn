@@ -1,0 +1,50 @@
+
+name: Python Package CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Conda environment
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        activate-environment: reef_sensing
+        environment-file: environment.yml
+        python-version: 3.10.8
+        auto-activate-base: false
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gdal-bin
+        pip install -e .
+    - name: Run tests
+      shell: bash -l {0}
+      run: |
+        pwd
+        ls
+        conda info
+        conda list
+        python -m coverage run --source App -m unittest discover
+        python -m coverage xml -o coverage.xml
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage
+        path: coverage.xml
+    - uses: actions/checkout@master
+    - uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
+        files: coverage.xml

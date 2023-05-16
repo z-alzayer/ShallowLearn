@@ -1,0 +1,17 @@
+Metadata-Version: 2.1
+Name: reef-sensing
+Version: 0.0.1
+Summary: Shallow water remote sensing package
+Author: z-z
+Author-email: <na@protonmail.com>
+Keywords: remote sensing etc
+Classifier: Development Status :: 1 - Planning
+Classifier: Intended Audience :: Developers
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: Unix
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Operating System :: Microsoft :: Windows
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+Package that integrates remote sensing workflows for shallow water environments and machine learning
