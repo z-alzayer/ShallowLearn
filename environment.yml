@@ -219,3 +219,4 @@ dependencies:
       - xgboost==1.7.1
       - yellowbrick==1.5
       - zipp==3.11.0
+      - pytest==7.3.1
