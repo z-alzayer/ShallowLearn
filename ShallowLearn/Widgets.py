@@ -5,7 +5,7 @@ import numpy as np
 from IPython.display import display
 
 class BandPlotter:
-    def __init__(self, image, cmap='gray', discrete_cmap=False):
+    def __init__(self, image, cmap='gray', discrete_cmap=False, figsize = (15, 10)):
         self.image = image
         self.band = 0
         self.cmap = plt.get_cmap(cmap)
@@ -15,7 +15,7 @@ class BandPlotter:
         assert len(self.image.shape) == 3, "Image should be 3-dimensional (height, width, channels)"
 
         # Create the figure and axis
-        self.fig, self.ax = plt.subplots(1, 2, figsize=(15, 10))
+        self.fig, self.ax = plt.subplots(1, 2, figsize=figsize)
         self.img_plot = self.ax[0].imshow(self.image[:,:,self.band], cmap=self.get_cmap())
         self.cbar = self.fig.colorbar(self.img_plot, ax=self.ax[0], orientation='vertical')
         self.plot_histogram()
