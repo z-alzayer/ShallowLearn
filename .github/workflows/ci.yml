@@ -18,7 +18,7 @@ jobs:
     - name: Set up Conda environment
       uses: conda-incubator/setup-miniconda@v2
       with:
-        activate-environment: reef_sensing
+        activate-environment: ShallowLearn
         environment-file: environment.yml
         python-version: 3.10.8
         auto-activate-base: false
