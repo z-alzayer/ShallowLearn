@@ -2,7 +2,8 @@ import numpy as np
 from sklearn.preprocessing import minmax_scale
 import matplotlib.pyplot as plt
 import joblib
-from skimage.color import rgb2lab
+from skimage.color import rgb2lab, rgb2hsv, rgb2ycbcr
+from ShallowLearn.band_mapping import band_mapping
 
 from ShallowLearn import LoadData
 
@@ -22,30 +23,88 @@ def load_img(path):
     img = np.swapaxes(img, 0, 1)
     return img
 
-def plot_rgb(img, bands=[4, 3, 2], plot = False):
+def plot_rgb(img, bands=None, plot=False):
     """
     Plots the RGB image using the specified bands.
 
     Args:
         img (numpy.ndarray): The input image array.
-        bands (list): The list of bands to use for the RGB channels. Default is [4, 3, 2].
+        bands (list): The list of band codes to use for the RGB channels. Default is ['B04', 'B03', 'B02'].
+        plot (bool): Whether to display the image plot using matplotlib. Default is False.
 
     Returns:
-        numpy array with selected bands: The RGB image array if plot set to False.
+        numpy array with selected bands: The RGB image array if plot is set to False.
 
     """
+    if bands is None:
+        bands = ['B04', 'B03', 'B02']  # Default band codes
+
+    band_numbers = [band_mapping[band]['index'] for band in bands]
+
     img_shape = img.shape
-    r = np.uint8(minmax_scale(img[:, :, bands[0]].flatten(), feature_range=(0, 255), axis=0, copy=True)).reshape(
+    r = np.uint8(minmax_scale(img[:, :, band_numbers[0]].flatten(), feature_range=(0, 255), axis=0, copy=True)).reshape(
         img_shape[0], img_shape[1])
-    g = np.uint8(minmax_scale(img[:, :, bands[1]].flatten(), feature_range=(0, 255), axis=0, copy=True)).reshape(
+    g = np.uint8(minmax_scale(img[:, :, band_numbers[1]].flatten(), feature_range=(0, 255), axis=0, copy=True)).reshape(
         img_shape[0], img_shape[1])
-    b = np.uint8(minmax_scale(img[:, :, bands[2]].flatten(), feature_range=(0, 255), axis=0, copy=True)).reshape(
+    b = np.uint8(minmax_scale(img[:, :, band_numbers[2]].flatten(), feature_range=(0, 255), axis=0, copy=True)).reshape(
         img_shape[0], img_shape[1])
     rgb = np.dstack((r, g, b))
-    if plot == True:
+
+    if plot:
         plt.imshow(rgb)
+        plt.show()
         return None
+
     return rgb
+
+def plot_hsv(img, plot=False):
+    """
+    Converts the input image to the HSV color space and optionally plots the H channel.
+
+    Args:
+        img (numpy.ndarray): The input image array.
+        plot (bool): Flag to indicate whether to plot the H channel or not. Default is False.
+
+    Returns:
+        numpy.ndarray or None: The hsv array if plot=False, otherwise None.
+
+    """
+    hsv_img = rgb2hsv(plot_rgb(img))
+    h_channel = hsv_img[:, :, 0]
+    
+    if plot == False:
+        return hsv_img
+    # Plot the H channel
+    plt.imshow(h_channel, cmap='hsv')
+    plt.axis('off')
+    plt.title('H Channel')
+    plt.show()
+    return None
+
+def plot_ycbcr(img, plot=False):
+    """
+    Converts the input image to the YCbCr color space and optionally plots the Y channel.
+
+    Args:
+        img (numpy.ndarray): The input image array.
+        plot (bool): Flag to indicate whether to plot the Y channel or not. Default is False.
+
+    Returns:
+        numpy.ndarray or None: The ycbcr array if plot=False, otherwise None.
+
+    """
+    ycbcr_img = rgb2ycbcr(plot_rgb(img))
+    y_channel = ycbcr_img[:, :, 0]
+    
+    if plot == False:
+        return ycbcr_img
+    # Plot the Y channel
+    plt.imshow(y_channel, cmap='gray')
+    plt.axis('off')
+    plt.title('Y Channel')
+    plt.show()
+    return None
+
 
 
 
@@ -90,7 +149,22 @@ def predict_mask(img, mask_val=9):
     pred = loaded_pipeline.predict(temp) == mask_val
     return pred.reshape(img_shape[0], img_shape[1])
 
-def generate_multichannel_mask(img, mask=9):
+def gen_mask(img, mask=9):
+    """
+    Generates a mask for the input image based on the predicted mask.
+
+    Args:
+        img (numpy.ndarray): The input image array.
+        mask (int): The mask value to consider. Default is 9.
+
+    Returns:
+        numpy.ndarray: The mask array.
+
+    """
+    mask = predict_mask(img, mask)
+    return mask
+
+def generate_multichannel_mask(img, mask=None, mask_val=9):
     """
     Generates a multichannel mask for the input image based on the predicted mask.
 
@@ -102,7 +176,9 @@ def generate_multichannel_mask(img, mask=9):
         numpy.ndarray: The multichannel mask array.
 
     """
-    mask = predict_mask(img, mask)
+    if mask is None:
+        mask = gen_mask(img, mask_val)
+    
     reshaped_mask = np.repeat(mask[:, :, np.newaxis], img.shape[2], axis=2)
     final_mask = img * reshaped_mask
     rescaled_image = final_mask.copy()
@@ -164,4 +240,3 @@ def plot_histograms(img, plot=True, bins=50, min_value=1):
         # b = np.uint8(minmax_scale(b.flatten(),feature_range=(0,255),  axis=0, copy=True )).reshape(534, 725)
         # rescaled_img = np.swapaxes(np.array([r,g,b]), 0, 2)
         pass
-    

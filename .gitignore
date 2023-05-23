@@ -2,6 +2,7 @@
 .coverage
 .venv/
 .vscode/
-Data/*
-Models/*
+Data/
+Models/
 creds
+Animations/

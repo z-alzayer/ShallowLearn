@@ -2,9 +2,15 @@ import numpy as np
 import rasterio
 import csv
 import pandas as pd
+
+
 class DataLoader:
     def __init__(self, data_source):
         self.data_source = data_source
+
+    def transform(self):
+        """Abstract transform method that should be implemented by the subclass"""
+        raise NotImplementedError("This method should be implemented by the subclass")
 
     def load(self):
         """Abstract load method that should be implemented by the subclass"""
