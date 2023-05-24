@@ -19,8 +19,21 @@ To install the ShallowLearn package and its dependencies, clone the repository a
 git clone https://github.com/yourusername/ShallowLearn.git
 cd ShallowLearn
 conda env create -f environment.yml
+pip install -e .
 ```
-
+You'll need to install gdal beforehand look up the specific installation instructions for your OS.
+Debian based linux should be:
+```
+sudo apt install gdal
+```
+macos
+```
+brew install gdal
+```
+Windows/WSL
+```
+conda install -c conda-forge gdal
+```
 ### Usage
 
 ShallowLearn is a Python package and can be imported like any other package. A typical usage scenario would be as follows:
