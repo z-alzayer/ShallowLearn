@@ -1,7 +1,8 @@
-
+import numpy.ma as ma
 import numpy as np
 import colorsys
 import math
+from math import pi
 
 def BCET(image, min_value=0, max_value=255, desired_mean=110):
     """
@@ -118,18 +119,18 @@ def rgb_to_hsi(rgb):
     b = rgb[:, :, 2]
 
     # Calculate Intensity
-    I = 1 / 3.0 * np.sum(rgb, axis=-1)
+    I = np.nanmean(rgb, axis=-1)
 
     # Calculate Saturation
-    num = 1 / 3.0 * np.sum((rgb - I[:, :, np.newaxis]) ** 2, axis=-1)
+    num = np.nanmean((rgb - I[:, :, np.newaxis]) ** 2, axis=-1)
     den = 2 * I * (1 - I)
-    den[den == 0] = 1  # to avoid division by zero
+    den = np.where(np.isnan(den), 1, den) # handle NaN
     S = np.sqrt(num / den)
 
     # Calculate Hue
     num = 0.5 * ((r - g) + (r - b))
     den = np.sqrt((r - g) ** 2 + (r - b) * (g - b))
-    den[den == 0] = 0.00001  # to avoid division by zero
+    den = np.where(np.isnan(den), 0.00001, den) # handle NaN
     theta = np.arccos(num / den)
 
     H = theta.copy()
@@ -142,12 +143,20 @@ def rgb_to_hsi(rgb):
     
     return hsi
 
-
-
 def hsi_to_rgb(hsi):
     H = hsi[:, :, 0]  # Hue
     S = hsi[:, :, 1]  # Saturation
     I = hsi[:, :, 2]  # Intensity
+
+    # Create NaN mask for each H, S, I 
+    H_nan_mask = np.isnan(H)
+    S_nan_mask = np.isnan(S)
+    I_nan_mask = np.isnan(I)
+
+    # Where there are NaNs, set values to a safe number to prevent issues in calculation
+    H[H_nan_mask] = 0
+    S[S_nan_mask] = 0
+    I[I_nan_mask] = 0
 
     R = np.zeros(H.shape)
     G = np.zeros(H.shape)
@@ -176,6 +185,11 @@ def hsi_to_rgb(hsi):
     R = np.clip(R, 0, 1) * 255.0
     G = np.clip(G, 0, 1) * 255.0
     B = np.clip(B, 0, 1) * 255.0
+
+    # Restore NaN values
+    R[H_nan_mask | S_nan_mask | I_nan_mask] = np.nan
+    G[H_nan_mask | S_nan_mask | I_nan_mask] = np.nan
+    B[H_nan_mask | S_nan_mask | I_nan_mask] = np.nan
 
     rgb = np.dstack((R, G, B)).astype(np.uint8)
 
