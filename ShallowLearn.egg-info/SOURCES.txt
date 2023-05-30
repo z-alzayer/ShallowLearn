@@ -1,10 +1,15 @@
 LICENSE
 README.md
 setup.py
+ShallowLearn/ImageHelper.py
+ShallowLearn/Indices.py
 ShallowLearn/LoadData.py
 ShallowLearn/Training.py
+ShallowLearn/Transform.py
+ShallowLearn/Widgets.py
 ShallowLearn/__init__.py
 ShallowLearn/api_download.py
+ShallowLearn/band_mapping.py
 ShallowLearn.egg-info/PKG-INFO
 ShallowLearn.egg-info/SOURCES.txt
 ShallowLearn.egg-info/dependency_links.txt
