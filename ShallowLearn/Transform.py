@@ -1,5 +1,7 @@
 
 import numpy as np
+import colorsys
+import math
 
 def BCET(image, min_value=0, max_value=255, desired_mean=110):
     """
@@ -104,3 +106,77 @@ def LCE_multi(image):
         output_image[:, :, channel] = linear_contrast_enhancement(image[:, :, channel])
 
     return output_image
+
+
+
+def rgb_to_hsi(rgb):
+    # Normalize the RGB values
+    rgb = rgb / 255.0
+
+    r = rgb[:, :, 0]
+    g = rgb[:, :, 1]
+    b = rgb[:, :, 2]
+
+    # Calculate Intensity
+    I = 1 / 3.0 * np.sum(rgb, axis=-1)
+
+    # Calculate Saturation
+    num = 1 / 3.0 * np.sum((rgb - I[:, :, np.newaxis]) ** 2, axis=-1)
+    den = 2 * I * (1 - I)
+    den[den == 0] = 1  # to avoid division by zero
+    S = np.sqrt(num / den)
+
+    # Calculate Hue
+    num = 0.5 * ((r - g) + (r - b))
+    den = np.sqrt((r - g) ** 2 + (r - b) * (g - b))
+    den[den == 0] = 0.00001  # to avoid division by zero
+    theta = np.arccos(num / den)
+
+    H = theta.copy()
+    H[b > g] = 2 * np.pi - H[b > g]
+
+    H = H / (2 * np.pi)  # normalize to [0, 1]
+    H = H * 360  # scale to degrees
+
+    hsi = np.dstack((H, S, I))
+    
+    return hsi
+
+
+
+def hsi_to_rgb(hsi):
+    H = hsi[:, :, 0]  # Hue
+    S = hsi[:, :, 1]  # Saturation
+    I = hsi[:, :, 2]  # Intensity
+
+    R = np.zeros(H.shape)
+    G = np.zeros(H.shape)
+    B = np.zeros(H.shape)
+
+    # RG sector (0 <= H < 120)
+    idx = (0 <= H) & (H < 120)
+    B[idx] = I[idx] * (1 - S[idx])
+    R[idx] = I[idx] * (1 + S[idx] * np.cos(np.deg2rad(H[idx])) / np.cos(np.deg2rad(60 - H[idx])))
+    G[idx] = 3*I[idx] - (R[idx] + B[idx])
+
+    # GB sector (120 <= H < 240)
+    idx = (120 <= H) & (H < 240)
+    H[idx] = H[idx] - 120
+    R[idx] = I[idx] * (1 - S[idx])
+    G[idx] = I[idx] * (1 + S[idx] * np.cos(np.deg2rad(H[idx])) / np.cos(np.deg2rad(60 - H[idx])))
+    B[idx] = 3*I[idx] - (R[idx] + G[idx])
+
+    # BR sector (240 <= H < 360)
+    idx = (240 <= H) & (H <= 360)
+    H[idx] = H[idx] - 240
+    G[idx] = I[idx] * (1 - S[idx])
+    B[idx] = I[idx] * (1 + S[idx] * np.cos(np.deg2rad(H[idx])) / np.cos(np.deg2rad(60 - H[idx])))
+    R[idx] = 3*I[idx] - (G[idx] + B[idx])
+
+    R = np.clip(R, 0, 1) * 255.0
+    G = np.clip(G, 0, 1) * 255.0
+    B = np.clip(B, 0, 1) * 255.0
+
+    rgb = np.dstack((R, G, B)).astype(np.uint8)
+
+    return rgb
