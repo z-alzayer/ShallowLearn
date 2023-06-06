@@ -3,6 +3,7 @@ from sentinelsat import SentinelAPI, read_geojson, geojson_to_wkt
 import abc
 from datetime import date
 import os
+from shapely.geometry import box
 
 
 class Creds():
@@ -100,7 +101,7 @@ class SentinelSatDownload(DownloadFiles):
         self.username = username
         self.password = password
     
-    def download(self, bbox, dates:list[str], cloud_cover:[int]):
+    def download(self, bbox, dates:list[str], cloud_cover:[int], path:str):
         """Download Sentinel-2 products using a bounding box and a date range.
         
         Args:
@@ -109,14 +110,16 @@ class SentinelSatDownload(DownloadFiles):
             cloud_cover (list[int]): The minimum and maximum cloud cover percentage allowed.
         """
         api = SentinelAPI(self.username, self.password, 'https://scihub.copernicus.eu/dhus')
+        print(api)
         # search for products
         products = api.query(bbox,
                             date=(dates[0], dates[1]),
                             platformname='Sentinel-2',
+                            producttype='S2MSI2A',
                             cloudcoverpercentage=(cloud_cover[0], cloud_cover[1]))
 
         # download the products
-        api.download_all(products)
+        api.download_all(products, directory_path=path)
 
 
 
@@ -128,32 +131,32 @@ def main():
     sentinel_password = os.environ.get('SEN_PASS')
 
     # Latitude and longitude for a location near London
-    london_lat, london_lon = 51.5074, -0.1278
+    london_lat, london_lon = 16.0959,-86.9362
 
     # Date range for the search YMD format for sentinel-2 - fix for landsat eventually probably
-    start_date = '20210101'
-    end_date = '20220131'
+    start_date = '20170101'
+    end_date = '20230131'
 
     # Maximum cloud cover percentage for Landsat
-    max_cloud_cover_landsat = 20
+    max_cloud_cover_landsat = 35
 
     # Cloud cover range for Sentinel-2
     min_cloud_cover_sentinel = 0
-    max_cloud_cover_sentinel = 20
+    max_cloud_cover_sentinel = 25
 
     # # Instantiate the Landsat downloader and search for scenes
-    landsat_downloader = LandSatDownload(landsat_username, landsat_password)
-    landsat_scenes = landsat_downloader.download('landsat_ot_c2_l2', [london_lat, london_lon], [start_date, end_date], max_cloud_cover_landsat)
-    print("Landsat scenes:", landsat_scenes)
+    # landsat_downloader = LandSatDownload(landsat_username, landsat_password)
+    # landsat_scenes = landsat_downloader.download('landsat_ot_c2_l2', [london_lat, london_lon], [start_date, end_date], max_cloud_cover_landsat)
+    # print("Landsat scenes:", landsat_scenes)
 
     # # Instantiate the Sentinel-2 downloader and search for products
-    # sentinel_downloader = SentinelSatDownload(sentinel_username, sentinel_password)
+    sentinel_downloader = SentinelSatDownload(sentinel_username, sentinel_password)
+
+    # Create a bounding box around the location (approx. 1 degree in each direction)
+    bbox = f"POLYGON(({london_lon - 0.001} {london_lat - 0.001}, {london_lon - 0.001} {london_lat + 0.001}, {london_lon + 0.001} {london_lat + 0.001}, {london_lon + 0.001} {london_lat - 0.001}, {london_lon - 0.001} {london_lat - 0.001}))"
     
-    # # Create a bounding box around the location (approx. 1 degree in each direction)
-    # bbox = f"POLYGON(({london_lon - 1} {london_lat - 1}, {london_lon - 1} {london_lat + 1}, {london_lon + 1} {london_lat + 1}, {london_lon + 1} {london_lat - 1}, {london_lon - 1} {london_lat - 1}))"
-    
-    # sentinel_products = sentinel_downloader.download(bbox, [start_date, end_date], [min_cloud_cover_sentinel, max_cloud_cover_sentinel])
-    # print("Sentinel-2 products:", sentinel_products)
+    sentinel_products = sentinel_downloader.download(bbox, [start_date, end_date], [min_cloud_cover_sentinel, max_cloud_cover_sentinel], path = "/media/ziad/Expansion/Honduras/")
+    print("Sentinel-2 products:", sentinel_products)
 
 if __name__ == '__main__':
     main()
