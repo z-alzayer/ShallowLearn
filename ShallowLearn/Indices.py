@@ -91,27 +91,35 @@ def ti(image, bands=None):
     Computes the Turbidity Index (TI) using the specified band codes.
     
     Purpose:
-    The Turbidity Index is used to measure water turbidity, which indicates the presence of suspended particles. It helps in assessing water quality and monitoring changes in water clarity caused by sedimentation or pollution.
+    The Turbidity Index is used to estimate the turbidity in water bodies. It helps in monitoring water quality, sediment transport, and erosion processes.
     
     Parameters:
     - image: numpy array, shape (height, width, num_bands)
       The input image array.
     - bands: list of str, optional
-      The band codes to use for computing the index. Default is ['B02', 'B04', 'B05', 'B12'].
+      The band codes to use for computing the index. Default is ['B04', 'B08'].
     
     Returns:
     - ti: numpy array, shape (height, width)
       The computed Turbidity Index.
     """
     if bands is None:
-        bands = ['B02', 'B04', 'B05', 'B12']  # Default band codes
+        bands = ['B04', 'B08']  # Default band codes
     band_numbers = get_band_numbers(bands)
     validate_band_shape(image, band_numbers)
-    green_band = image[:, :, band_numbers[0]]
-    red_band = image[:, :, band_numbers[1]]
-    red_edge_band = image[:, :, band_numbers[2]]
-    swir_band = image[:, :, band_numbers[3]]
-    ti = (green_band + red_band + red_edge_band) / swir_band
+    red_band = image[:, :, band_numbers[0]]
+    nir_band = image[:, :, band_numbers[1]]
+    
+    # Check for divide by zero errors
+    denominator = nir_band + red_band
+    denominator = denominator.astype(float)
+    denominator[denominator == 0] = np.nan  # Replace zero with NaN to avoid divide by zero errors
+    
+    ti = (nir_band - red_band) / (denominator + 1)
+    
+    # Check for NaN values in the result
+    ti = np.nan_to_num(ti, nan=0.0)  # Replace NaN values with 0.0
+    
     return ti
 
 def wqi(image, bands=None):
@@ -165,35 +173,35 @@ def ndci(image, bands=None):
     validate_band_shape(image, band_numbers)
     green_band = image[:, :, band_numbers[0]]
     red_edge_band = image[:, :, band_numbers[1]]
-    ndci = (green_band - red_edge_band) / (green_band + red_edge_band)
+    ndci = (green_band - red_edge_band) / (green_band + red_edge_band) + 1
     return ndci
 
-def wbei(image, bands=None):
-    """
-    Computes the Water Body Extraction Index (WBEI) using the specified band codes.
+# def wbei(image, bands=None):
+#     """
+#     Computes the Water Body Extraction Index (WBEI) using the specified band codes.
     
-    Purpose:
-    The Water Body Extraction Index is used to extract water bodies from remote sensing imagery. It helps in distinguishing water pixels from other land features based on the spectral properties of water bodies.
+#     Purpose:
+#     The Water Body Extraction Index is used to extract water bodies from remote sensing imagery. It helps in distinguishing water pixels from other land features based on the spectral properties of water bodies.
     
-    Parameters:
-    - image: numpy array, shape (height, width, num_bands)
-      The input image array.
-    - bands: list of str, optional
-      The band codes to use for computing the index. Default is ['B04', 'B03', 'B02'].
+#     Parameters:
+#     - image: numpy array, shape (height, width, num_bands)
+#       The input image array.
+#     - bands: list of str, optional
+#       The band codes to use for computing the index. Default is ['B04', 'B03', 'B02'].
     
-    Returns:
-    - wbei: numpy array, shape (height, width)
-      The computed Water Body Extraction Index.
-    """
-    if bands is None:
-        bands = ['B04', 'B03', 'B02']  # Default band codes
-    band_numbers = get_band_numbers(bands)
-    validate_band_shape(image, band_numbers)
-    red_band = image[:, :, band_numbers[0]]
-    green_band = image[:, :, band_numbers[1]]
-    blue_band = image[:, :, band_numbers[2]]
-    wbei = (green_band - red_band) / (green_band + red_band + blue_band)
-    return wbei
+#     Returns:
+#     - wbei: numpy array, shape (height, width)
+#       The computed Water Body Extraction Index.
+#     """
+#     if bands is None:
+#         bands = ['B04', 'B03', 'B02']  # Default band codes
+#     band_numbers = get_band_numbers(bands)
+#     validate_band_shape(image, band_numbers)
+#     red_band = image[:, :, band_numbers[0]]
+#     green_band = image[:, :, band_numbers[1]]
+#     blue_band = image[:, :, band_numbers[2]]
+#     wbei = (green_band - red_band) / (green_band + red_band + blue_band)
+#     return wbei
 
 def bgr(image, bands=None):
     """
@@ -226,7 +234,35 @@ def bgr(image, bands=None):
     bgr = blue_band / green_band
     return bgr
 
-
+def mask_land(image, land_band='B11', threshold=10):
+    """
+    Masks out the land areas in an image using the specified land band.
+    
+    Purpose:
+    This function is used to mask out the land areas in a satellite image. It uses a specified band (default is Band 11) and a threshold value to determine which areas are land.
+    
+    Parameters:
+    - image: numpy array, shape (height, width, num_bands)
+      The input image array.
+    - land_band: a string, optional
+      The band code to use for identifying land. Default is 'B11'.
+    - threshold: float, optional
+      The threshold value to use for identifying land. Default is 10.
+    
+    Returns:
+    - masked_image: numpy array, shape (height, width, num_bands)
+      The input image array with land areas masked out.
+    """
+    land_band = [land_band]
+    band_number = get_band_numbers(land_band)
+    #validate_band_shape(image, [band_number])
+    land_band_image = image[:, :, band_number]
+    
+    # Create a mask where land areas (values above the threshold) are True
+    land_mask = land_band_image > threshold
+    
+    
+    return land_mask
 
 
 def get_band_numbers(bands):
@@ -241,3 +277,23 @@ def validate_band_shape(image, bands):
     """
     if len(image.shape) < 3 or image.shape[2] < max(bands) + 1:
         raise ValueError("Invalid band shape in the image array.")
+    
+# from functools import wraps
+
+# def handle_nan_values(func):
+#     @wraps(func)
+#     def wrapper(image, bands=None):
+#         result = func(image, bands)
+#         return np.nan_to_num(result, nan=0.0)
+    
+#     return wrapper
+
+# # Apply the decorator to your functions
+# ci = handle_nan_values(ci)
+# oci = handle_nan_values(oci)
+# ssi = handle_nan_values(ssi)
+# ti = handle_nan_values(ti)
+# wqi = handle_nan_values(wqi)
+# ndci = handle_nan_values(ndci)
+# wbei = handle_nan_values(wbei)
+# bgr = handle_nan_values(bgr)

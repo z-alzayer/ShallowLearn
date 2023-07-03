@@ -2,17 +2,21 @@ import pandas as pd
 import numpy as np
 import rasterio as rio 
 import os
+import pkg_resources
 
-from ShallowLearn import LoadData
 
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.impute import SimpleImputer
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.model_selection import GridSearchCV
+from sklearn.mixture import GaussianMixture
+from openTSNE.sklearn import TSNE
 
-import pkg_resources
+from ShallowLearn import LoadData
+from ShallowLearn.band_mapping import band_mapping
+
 
 
 
@@ -33,7 +37,10 @@ class TrainOnFullReefs():
         path = pkg_resources.resource_filename('ShallowLearn', '../Data/Clear_Reefs.csv')
         X_train = reshape_data(preprocess_data(path))
         print(X_train.shape)
-        X_train = np.unique(X_train, axis=0) # Remove duplicate rows
+        X_train = pd.DataFrame(X_train, columns = band_mapping.keys())
+        # X_train = X_train.drop(columns = ["B10"], axis = 1)
+        X_train = X_train.loc[~(X_train==0).any(axis=1)]
+        X_train = X_train.drop_duplicates()
         print(X_train.shape)
         # Define the pipeline steps
         scaler = StandardScaler()
@@ -42,8 +49,8 @@ class TrainOnFullReefs():
         # Define the pipeline
         my_pipeline = Pipeline([
             ('scaler', scaler),
-            ('pca', PCA(n_components=2)),
-            ('kmeans', KMeans(n_clusters=10, init='k-means++', random_state=42))
+            ('pca', PCA(n_components=2, random_state=42)),
+            ('kmeans', KMeans(n_clusters=10, random_state=42))
         ])
 
         # Define the hyperparameters to tune
@@ -73,7 +80,7 @@ class TrainOnFullReefs():
         # score = best_pipeline.score(X_test)
         my_pipeline.fit(X_train)
         import joblib
-        joblib.dump(my_pipeline, '/home/ziad/Documents/Github/ShallowLearn/Models/pipeline_pca2_k10.pkl')
+        joblib.dump(my_pipeline, '/home/ziad/Documents/Github/ShallowLearn/Models/pipeline_pca2_kmeans10.pkl')
     
     class TrainOnLABSpace():
 

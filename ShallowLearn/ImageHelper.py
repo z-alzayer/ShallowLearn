@@ -6,6 +6,8 @@ from skimage.color import rgb2lab, rgb2hsv, rgb2ycbcr
 from ShallowLearn.band_mapping import band_mapping
 
 from ShallowLearn import LoadData
+from matplotlib.colors import ListedColormap, to_rgba
+from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 
 def load_img(path):
     """
@@ -22,6 +24,25 @@ def load_img(path):
     img = np.swapaxes(img, 0, 2)
     img = np.swapaxes(img, 0, 1)
     return img
+
+def remove_channel(img, channel):
+    """
+    Removes a specified channel from a 3D image array.
+
+    Args:
+        img (numpy.ndarray): The 3D image array with shape (height, width, channels).
+        channel (int): The index of the channel to remove.
+
+    Returns:
+        numpy.ndarray: The image array with the specified channel removed.
+
+    Raises:
+        ValueError: If the channel index is out of bounds.
+    """
+    if channel < 0 or channel >= img.shape[2]:
+        raise ValueError("Channel index is out of bounds.")
+
+    return np.concatenate((img[:, :, :channel], img[:, :, channel+1:]), axis=2)
 
 def plot_rgb(img, bands=None, plot=False):
     """
@@ -131,22 +152,33 @@ def plot_lab(img, plot=False):
     plt.show()
     return None
 
-def predict_mask(img, mask_val=9):
+def predict_mask(img, model = None,  mask_val=None, estimator = None):
     """
     Predicts the mask for the input image using a pre-trained model.
 
     Args:
         img (numpy.ndarray): The input image array.
+        model (str): The path to the pre-trained model. Default is None and uses all 13 bands.
         mask_val (int): The mask value to consider. Default is 9.
 
     Returns:
         numpy.ndarray: The predicted mask for the image.
 
     """
-    loaded_pipeline = joblib.load('../Models/pipeline_pca2_k10.pkl')
+    if model is None:
+        loaded_pipeline = joblib.load('../Models/pipeline_pca2_k10.pkl')
+    else:
+        loaded_pipeline = joblib.load(model)
+    
+    if estimator is not None:
+        loaded_pipeline = estimator
+
     img_shape = img.shape
     temp = img.reshape(img_shape[0] * img_shape[1], img_shape[2])
-    pred = loaded_pipeline.predict(temp) == mask_val
+    if mask_val is None:
+        pred = loaded_pipeline.predict(temp) 
+    else:
+        pred = loaded_pipeline.predict(temp) == mask_val
     return pred.reshape(img_shape[0], img_shape[1])
 
 def gen_mask(img, mask=9):
@@ -163,6 +195,22 @@ def gen_mask(img, mask=9):
     """
     mask = predict_mask(img, mask)
     return mask
+
+def apply_mask(data, mask, fill_value=0):
+    """
+    Applies a mask to the data array.
+
+    Args:
+        data (numpy.ndarray): The input data array.
+        mask (numpy.ndarray): The mask array.
+        fill_value (float): The value to use where the mask is False.
+
+    Returns:
+        numpy.ndarray: The masked data array.
+    """
+    masked_data = np.where(mask, data, fill_value)
+    return masked_data
+
 
 def generate_multichannel_mask(img, mask=None, mask_val=9):
     """
@@ -240,3 +288,51 @@ def plot_histograms(img, plot=True, bins=50, min_value=1):
         # b = np.uint8(minmax_scale(b.flatten(),feature_range=(0,255),  axis=0, copy=True )).reshape(534, 725)
         # rescaled_img = np.swapaxes(np.array([r,g,b]), 0, 2)
         pass
+
+
+def discrete_implot(arr, change_labels=None, change_colors=None, pixel_scale=10, title = None):
+    if len(arr.shape) == 1:
+        arr = np.reshape(arr, (-1, 1))  # Reshape 1D array to 2D
+
+    unique_labels = np.unique(arr)
+    num_labels = len(unique_labels)
+    label_to_int = {label: i for i, label in enumerate(unique_labels)}
+    int_arr = np.vectorize(label_to_int.get)(arr)  # Convert labels to integers
+
+    # Create color list using the 'viridis' colormap
+    colors = plt.get_cmap('viridis')(np.linspace(0, 1, num_labels))
+    
+    # If change_labels and change_colors are specified, modify the corresponding colors
+    if change_labels is not None and change_colors is not None:
+        for label, color in zip(change_labels, change_colors):
+            if label in label_to_int:
+                colors[label_to_int[label]] = to_rgba(color)
+            else:
+                print(f"Label {label} not found in array.")
+
+    cmap = ListedColormap(colors)
+
+    fig, ax = plt.subplots()
+    im = ax.imshow(int_arr, cmap=cmap)
+
+    # Create a colorbar with discrete levels
+    cbar = fig.colorbar(im, ticks=np.arange(num_labels), drawedges=True)
+    cbar.set_label('Labels')
+    cbar.set_ticklabels(unique_labels)  # Set the tick labels to the unique_labels
+
+    # Add scale bar of 1 km
+    scalebar = AnchoredSizeBar(ax.transData,
+                               10 * pixel_scale, '1 km', 'lower right', 
+                               pad=0.25,
+                               color='white',
+                               frameon=False,
+                               size_vertical=1)
+    ax.add_artist(scalebar)
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    if title is not None:
+        ax.set_title(title)
+    else:
+        ax.set_title('Discrete Plot')
+    plt.show()

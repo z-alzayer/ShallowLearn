@@ -79,7 +79,6 @@ class LoadFromZip(DataLoader):
         # Implement code that will load data from a zip file
         pass
 
-
 if __name__ == "__main__":
     path_to_hdd = "/run/media/ziad/Expansion/Clipped_Reefs_By_Image/T55LCD_20151204T004052no_transform"
     file_name = "/6880_T55LCD_20151204T004052no_transform.tiff"
