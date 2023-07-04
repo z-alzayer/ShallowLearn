@@ -14,7 +14,7 @@ setup(
     name="ShallowLearn",
     version=VERSION,
     author="z-z",
-    author_email="<na@protonmail.com>",
+    author_email="<zba21@ic.ac.uk>",
     description=DESCRIPTION,
     long_description_content_type="text/markdown",
     long_description=LONG_DESCRIPTION,
