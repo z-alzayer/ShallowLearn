@@ -143,54 +143,62 @@ def rgb_to_hsi(rgb):
     
     return hsi
 
-def hsi_to_rgb(hsi):
-    H = hsi[:, :, 0]  # Hue
-    S = hsi[:, :, 1]  # Saturation
-    I = hsi[:, :, 2]  # Intensity
 
-    # Create NaN mask for each H, S, I 
-    H_nan_mask = np.isnan(H)
-    S_nan_mask = np.isnan(S)
-    I_nan_mask = np.isnan(I)
+import numpy as np
 
-    # Where there are NaNs, set values to a safe number to prevent issues in calculation
-    H[H_nan_mask] = 0
-    S[S_nan_mask] = 0
-    I[I_nan_mask] = 0
+def hsi_to_rgb(array):
+    """
+    Convert an array of HSI (Hue, Saturation, Intensity) values to an array of RGB values.
+    """
+    # Extract the HSI values from the array
+    h = array[:, :, 0]
+    s = array[:, :, 1]
+    i = array[:, :, 2]
 
-    R = np.zeros(H.shape)
-    G = np.zeros(H.shape)
-    B = np.zeros(H.shape)
+    # Check if the hue is outside the range [0, 360)
+    h = np.where(h < 0, h + 360, h)
+    h = np.where(h >= 360, h - 360, h)
 
-    # RG sector (0 <= H < 120)
-    idx = (0 <= H) & (H < 120)
-    B[idx] = I[idx] * (1 - S[idx])
-    R[idx] = I[idx] * (1 + S[idx] * np.cos(np.deg2rad(H[idx])) / np.cos(np.deg2rad(60 - H[idx])))
-    G[idx] = 3*I[idx] - (R[idx] + B[idx])
+    # Check if the saturation is outside the range [0, 1]
+    s = np.clip(s, 0, 1)
 
-    # GB sector (120 <= H < 240)
-    idx = (120 <= H) & (H < 240)
-    H[idx] = H[idx] - 120
-    R[idx] = I[idx] * (1 - S[idx])
-    G[idx] = I[idx] * (1 + S[idx] * np.cos(np.deg2rad(H[idx])) / np.cos(np.deg2rad(60 - H[idx])))
-    B[idx] = 3*I[idx] - (R[idx] + G[idx])
+    # Check if the intensity is outside the range [0, 1]
+    i = np.clip(i, 0, 1)
 
-    # BR sector (240 <= H < 360)
-    idx = (240 <= H) & (H <= 360)
-    H[idx] = H[idx] - 240
-    G[idx] = I[idx] * (1 - S[idx])
-    B[idx] = I[idx] * (1 + S[idx] * np.cos(np.deg2rad(H[idx])) / np.cos(np.deg2rad(60 - H[idx])))
-    R[idx] = 3*I[idx] - (G[idx] + B[idx])
+    # Convert the hue to the range [0, 6)
+    h = h / 60
 
-    R = np.clip(R, 0, 1) * 255.0
-    G = np.clip(G, 0, 1) * 255.0
-    B = np.clip(B, 0, 1) * 255.0
+    # Calculate the chroma
+    c = (1 - np.abs(2*i - 1)) * s
 
-    # Restore NaN values
-    R[H_nan_mask | S_nan_mask | I_nan_mask] = np.nan
-    G[H_nan_mask | S_nan_mask | I_nan_mask] = np.nan
-    B[H_nan_mask | S_nan_mask | I_nan_mask] = np.nan
+    # Calculate the x value
+    x = c * (1 - np.abs(h % 2 - 1))
 
-    rgb = np.dstack((R, G, B)).astype(np.uint8)
+    # Calculate the m value
+    m = i - c/2
 
-    return rgb
+    # Calculate the RGB values
+    r, g, b = np.zeros_like(h), np.zeros_like(h), np.zeros_like(h)
+    idx = np.where((0 <= h) & (h < 1))
+    r[idx], g[idx], b[idx] = c[idx], x[idx], 0
+    idx = np.where((1 <= h) & (h < 2))
+    r[idx], g[idx], b[idx] = x[idx], c[idx], 0
+    idx = np.where((2 <= h) & (h < 3))
+    r[idx], g[idx], b[idx] = 0, c[idx], x[idx]
+    idx = np.where((3 <= h) & (h < 4))
+    r[idx], g[idx], b[idx] = 0, x[idx], c[idx]
+    idx = np.where((4 <= h) & (h < 5))
+    r[idx], g[idx], b[idx] = x[idx], 0, c[idx]
+    idx = np.where((5 <= h) & (h < 6))
+    r[idx], g[idx], b[idx] = c[idx], 0, x[idx]
+
+    # Add the m value to each RGB value
+    r, g, b = r + m, g + m, b + m
+
+    # Convert the RGB values to the range [0, 255]
+    r, g, b = (r * 255).astype(np.uint8), (g * 255).astype(np.uint8), (b * 255).astype(np.uint8)
+
+    # Stack the RGB values into a single array
+    rgb_array = np.stack((r, g, b), axis=2)
+
+    return rgb_array
