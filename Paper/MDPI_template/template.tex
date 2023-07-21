@@ -165,10 +165,9 @@ $^{2}$ \quad Affiliation 2; e-mail@e-mail.com}
 \section{Introduction}
 
 Over the past 40 years, the crucial yet challenging task of monitoring coral reefs has been undertaken, with data gathering initiatives tracing back to as early as the 1960s \cite{goreau1964mass}, and more comprehensive databases from the 1980s to 2022 \cite{Woesik2022},  as well as
-citizen science datasets \cite{ALA2021}.With these data sets encompassing sub-mapping scale information, remote sensing studies encompass a broad range of objectives, from local ecological surveillance to tracking carbon budgets \cite{duarte2017reviews}. In light of the threats imposed by climate change and anthropogenic activities \cite{hughes2010rising}, 
-and the rapid temperature rise that has led to a reduction in both coral cover and diversity \cite{bruno2007thermal}, there exists an immediate and pressing need for accurate and swift global coral reef monitoring and data fusion techniques.
-
-\citep{Hedley2016} provide a comprehensive overview of sensor limitations and uses 
+citizen science datasets \cite{ALA2021}.With these data sets encompassing sub-mapping scale information, remote sensing studies encompass a broad range of objectives, from local ecological surveillance to tracking carbon budgets \cite{duarte2017reviews}. In light of the threats imposed 
+by climate change and anthropogenic activities \cite{hughes2010rising}, 
+and the rapid temperature rise that has led to a reduction in both coral cover and diversity \cite{bruno2007thermal} \cite{pandolfi2003global} \cite{hoegh2007coral}, there exists an immediate and pressing need for accurate and swift global coral reef monitoring and data fusion techniques.
 
 
 Much of the recent research has centered around supervised learning algorithms, a form of machine learning that utilizes labeled data to train a model, thereby enabling it to predict labels for new data. 
@@ -182,8 +181,10 @@ Unsupervised learning is a type of machine learning that uses unlabelled data to
 In this study we aim to use a combination of unsupervised and supervised learning to classify coral reefs into different classes. Using a combination of more traditional clustering methods and various color spaces. We then use a supervised learning algorithms to provide additional insight into the clustering and 
 retrieve understandable results from the data and its clusters, including using simple logistic regression to gain insight into the data itself.
 
-Sea roughness due to wind is also a problem as very large changes in reflectance such as sun glint also affect the imagery negatively  and should generally be discarded and or masked out \cite{gordon1997atmospheric}
+\citep{Hedley2016} provide a comprehensive overview of sensor limitations and uses for coral reef monitoring, including the use of satellite imagery. sea roughness due to wind is also a problem as very large changes in reflectance such as sun glint also affect the imagery negatively  and should generally be discarded and or masked out \cite{gordon1997atmospheric}
 
+Object based segmentation methods have had good success at discriminating classes of various corals \cite{Nguyen2021}, with studies combining both pixel based methods and object based methods 
+also showing a high degree of accuracy in water bodies \cite{huang2015combining}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -257,9 +258,11 @@ additional scope for creating probability maps and testing the accuracy of the c
 
 This section may be divided by subheadings. It should provide a concise and precise description of the experimental results, their interpretation as well as the experimental conclusions that can be drawn.
 \section{Discussion}
+Authors should discuss the results and how they can be interpreted from the perspective of previous studies and of the working hypotheses. The findings and their implications should be discussed in the broadest context possible. Future research directions may also be highlighted.
+
 In this study we show that it is possible to achieve repeatable results using a combination of unsupervised and supervised learning methods to classify shallow water imagery in Sentinel-2 imagery. 
-We also show that it is possible to use these methods to create a probability map of a variety of shallow water classes (will expand this) with minimal preprocessing to cluster various times in different scenes and that this methodology can be applied to different areas whilst using simple explainable
-algorithms.
+We also show that it is possible to use these methods to create a probability map of a variety of shallow water classes (will expand this) with minimal preprocessing to cluster various times in different scenes and that this methodology can be applied to different geographies whilst 
+using simple explainable algorithms. 
 
 \subsection{Conclusions}
 
