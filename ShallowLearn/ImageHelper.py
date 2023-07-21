@@ -290,7 +290,7 @@ def plot_histograms(img, plot=True, bins=50, min_value=1):
         pass
 
 
-def discrete_implot(arr, change_labels=None, change_colors=None, pixel_scale=10, title = None):
+def discrete_implot(arr, change_labels=None, change_colors=None, pixel_scale=10, title = None, return_fig = False):
     if len(arr.shape) == 1:
         arr = np.reshape(arr, (-1, 1))  # Reshape 1D array to 2D
 
@@ -335,4 +335,6 @@ def discrete_implot(arr, change_labels=None, change_colors=None, pixel_scale=10,
         ax.set_title(title)
     else:
         ax.set_title('Discrete Plot')
+    if return_fig:
+        return fig
     plt.show()

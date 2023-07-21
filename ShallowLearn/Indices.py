@@ -1,6 +1,25 @@
 import numpy as np
 from ShallowLearn.band_mapping import band_mapping
 
+# Define constants and parameters
+MNDWI_thr = 0.2
+NDWI_thr = 0.2
+filter_UABS = True
+filter_SSI = False
+SDBgreen = True
+cs = 0
+preAnalysis = False
+m1 = 155.86
+m0 = 146.46
+mp = 1000
+pSDBmin = 0.201
+pSDBmax = 4.983
+nConst = 1000
+
+
+
+
+
 def ci(image, bands=None):
     """
     Computes the Chlorophyll Index (CI) using the specified band codes.
@@ -297,3 +316,66 @@ def validate_band_shape(image, bands):
 # ndci = handle_nan_values(ndci)
 # wbei = handle_nan_values(wbei)
 # bgr = handle_nan_values(bgr)
+
+def calculate_water_surface_index(band_array, bands = None):
+    """
+    Calculates Water Surface Index based on multiple spectral indices.
+    
+    Parameters:
+    band_array (numpy.ndarray): Multiband array with all Sentinel bands
+    
+    Returns:
+    int: Water surface index (1: water, 0: non-water)
+    """
+    if bands is None:
+        bands = ['B03', 'B04', 'B08', 'B11', 'B12']  # Default band codes
+    band_numbers = get_band_numbers(bands)
+    validate_band_shape(band_array, band_numbers)
+
+    green_band = band_array[:, :, band_numbers[0]]
+    red_band = band_array[:, :, band_numbers[1]]
+    nir_band = band_array[:, :, band_numbers[2]]
+    swir1_band = band_array[:, :, band_numbers[3]]
+    swir2_band = band_array[:, :, band_numbers[4]]
+
+    wsi = (green_band + red_band) - (nir_band + swir1_band + swir2_band)
+    
+    return wsi
+
+
+# Function to calculate pseudo Subsurface Depth
+def calculate_pseudo_subsurface_depth(band_array, bands = None):
+    """
+    Calculates pseudo Subsurface Depth based on the logarithmic ratio of the blue band to the green or red band.
+    
+    Parameters:
+    band_array (numpy.ndarray): Multiband array with all Sentinel bands
+    
+    Returns:
+    float: Pseudo subsurface depth
+    """
+    if bands is None:
+        bands = ['B02', 'B03']  # Default band codes
+    band_numbers = get_band_numbers(bands)
+    validate_band_shape(band_array, band_numbers)
+
+    blue_band = band_array[:, :, band_numbers[0]]
+    green_or_red_band = band_array[:, :, band_numbers[1]]
+
+    pseudo_sdb = np.log(green_or_red_band / blue_band)
+    return pseudo_sdb
+
+
+
+# Function to calculate actual Subsurface Depth
+def calculate_subsurface_depth(pseudo_SDB):
+    """
+    Calculates actual Subsurface Depth from the pseudo Subsurface Depth using a linear transformation.
+    
+    Parameters:
+    pseudo_SDB (float): Pseudo subsurface depth
+    
+    Returns:
+    float: Actual subsurface depth
+    """
+    return m1 * pseudo_SDB - m0

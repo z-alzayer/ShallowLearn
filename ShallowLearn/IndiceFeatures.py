@@ -20,7 +20,8 @@ class GenerateIndicesPerImage():
         functions = [function for function in functions if 
                      function[0] != 'validate_band_shape' and
                         function[0] != 'get_band_numbers' and 
-                        function[0] != 'mask_land']
+                        function[0] != 'mask_land' and
+                        len(function[0]) < 5]
         self.functions = functions
         print(functions)
         self.indices, self.indice_order = self.generate_indices()

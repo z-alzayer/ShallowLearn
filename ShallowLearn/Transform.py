@@ -3,6 +3,8 @@ import numpy as np
 import colorsys
 import math
 from math import pi
+from skimage.color import rgb2lab, lab2rgb
+from ShallowLearn.ImageHelper import plot_lab
 
 def BCET(image, min_value=0, max_value=255, desired_mean=110):
     """
@@ -202,3 +204,35 @@ def hsi_to_rgb(array):
     rgb_array = np.stack((r, g, b), axis=2)
 
     return rgb_array
+
+def transform_lab_stretch(array):
+    """
+    Transform an Image into LAB space and stretch the contrast of the L channel.
+    """
+    
+    lab_array = plot_lab(array)
+    lab_array[:, :, 0] = linear_contrast_enhancement(lab_array[:, :, 0])
+    rgb_array = lab2rgb(lab_array)
+    return rgb_array
+
+def transform_multiband_lab(arr, bands = None):
+    """
+    Reindex the bands of a multiband image to match the order of the LAB color space.
+    Input is a multiband array
+    If bands is None, the default is [3,2,1] - where 3 is the Red band, 2 is the Green band, and 1 is the Blue band.
+    """
+    if bands is None:
+        bands = [3,2,1]
+
+    arr_copy = arr.copy()
+    #convert arr_copy to float64
+    arr_copy = arr_copy.astype(np.float64)
+    rgb_arr = transform_lab_stretch(arr_copy)
+    
+    arr_copy[:,:,bands[0]] = rgb_arr[:,:,0]
+    arr_copy[:,:,bands[1]] = rgb_arr[:,:,1]
+    arr_copy[:,:,bands[2]] = rgb_arr[:,:,2]
+
+    return arr_copy
+
+

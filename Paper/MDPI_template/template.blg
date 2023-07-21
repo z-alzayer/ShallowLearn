@@ -1,0 +1,54 @@
+This is BibTeX, Version 0.99d (TeX Live 2022/dev/Debian)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: template.aux
+The style file: Definitions/mdpi.bst
+Illegal, another \bibstyle command---line 76 of file template.aux
+ : \bibstyle
+ :          {plainnat}
+I'm skipping whatever remains of this command
+Database file #1: export.bib
+Warning--entry type for "Hedley2016" isn't style-file defined
+--line 1227 of file export.bib
+Warning--can't use both volume and number fields in macqueen1967some
+You've used 20 entries,
+            2885 wiz_defined-function locations,
+            709 strings with 8283 characters,
+and the built_in function-call counts, 7975 in all, are:
+= -- 694
+> -- 463
+< -- 15
++ -- 207
+- -- 124
+* -- 682
+:= -- 1214
+add.period$ -- 61
+call.type$ -- 20
+change.case$ -- 20
+chr.to.int$ -- 20
+cite$ -- 20
+duplicate$ -- 372
+empty$ -- 645
+format.name$ -- 169
+if$ -- 1677
+int.to.chr$ -- 1
+int.to.str$ -- 20
+missing$ -- 20
+newline$ -- 101
+num.names$ -- 58
+pop$ -- 183
+preamble$ -- 0
+purify$ -- 20
+quote$ -- 0
+skip$ -- 245
+stack$ -- 0
+substring$ -- 391
+swap$ -- 90
+text.length$ -- 4
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 134
+warning$ -- 1
+while$ -- 63
+width$ -- 0
+write$ -- 241
+(There was 1 error message)

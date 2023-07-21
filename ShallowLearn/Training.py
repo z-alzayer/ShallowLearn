@@ -6,7 +6,7 @@ import pkg_resources
 
 
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, RobustScaler
+from sklearn.preprocessing import StandardScaler, RobustScaler, PowerTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
@@ -38,12 +38,12 @@ class TrainOnFullReefs():
         X_train = reshape_data(preprocess_data(path))
         print(X_train.shape)
         X_train = pd.DataFrame(X_train, columns = band_mapping.keys())
-        # X_train = X_train.drop(columns = ["B10"], axis = 1)
+        X_train = X_train.drop(columns = ["B10"], axis = 1)
         X_train = X_train.loc[~(X_train==0).any(axis=1)]
         X_train = X_train.drop_duplicates()
         print(X_train.shape)
         # Define the pipeline steps
-        scaler = StandardScaler()
+        scaler = PowerTransformer()
         imputer = SimpleImputer(strategy='mean')
 
         # Define the pipeline
@@ -80,7 +80,7 @@ class TrainOnFullReefs():
         # score = best_pipeline.score(X_test)
         my_pipeline.fit(X_train)
         import joblib
-        joblib.dump(my_pipeline, '/home/ziad/Documents/Github/ShallowLearn/Models/pipeline_pca2_kmeans10.pkl')
+        joblib.dump(my_pipeline, '/home/ziad/Documents/Github/ShallowLearn/Models/pipeline_pca2_kmeans10pow_nb10.pkl')
     
     class TrainOnLABSpace():
 

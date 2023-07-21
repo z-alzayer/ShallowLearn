@@ -1,0 +1,130 @@
+\begin{thebibliography}{999}
+
+\bibitem[Goreau(1964)]{goreau1964mass}
+Goreau, T.F.
+\newblock Mass expulsion of zooxanthellae from Jamaican reef communities after
+  Hurricane Flora.
+\newblock {\em Science} {\bf 1964}, {\em 145},~383--386.
+
+\bibitem[van Woesik and Kratochwill(2022)]{Woesik2022}
+van Woesik, R.; Kratochwill, C.
+\newblock A global coral-bleaching database, 1980–2020.
+\newblock {\em Scientific Data} {\bf 2022}, {\em 9}.
+\newblock {\url{https://doi.org/10.1038/s41597-022-01121-y}}.
+
+\bibitem[Belbin et~al.(2021)Belbin, Wallis, Hobern, and Zerger]{ALA2021}
+Belbin, L.; Wallis, E.; Hobern, D.; Zerger, A.
+\newblock The Atlas of Living Australia: History, current state and future
+  directions.
+\newblock {\em Biodiversity Data Journal} {\bf 2021}, {\em 9},~e65023,
+  \href{http://xxx.lanl.gov/abs/https://doi.org/10.3897/BDJ.9.e65023}{{\normalfont
+  [https://doi.org/10.3897/BDJ.9.e65023]}}.
+\newblock {\url{https://doi.org/10.3897/BDJ.9.e65023}}.
+
+\bibitem[Duarte(2017)]{duarte2017reviews}
+Duarte, C.M.
+\newblock Reviews and syntheses: Hidden forests, the role of vegetated coastal
+  habitats in the ocean carbon budget.
+\newblock {\em Biogeosciences} {\bf 2017}, {\em 14},~301--310.
+
+\bibitem[Hughes et~al.(2010)Hughes, Graham, Jackson, Mumby, and
+  Steneck]{hughes2010rising}
+Hughes, T.P.; Graham, N.A.; Jackson, J.B.; Mumby, P.J.; Steneck, R.S.
+\newblock Rising to the challenge of sustaining coral reef resilience.
+\newblock {\em Trends in ecology \& evolution} {\bf 2010}, {\em 25},~633--642.
+
+\bibitem[Bruno et~al.(2007)Bruno, Selig, Casey, Page, Willis, Harvell,
+  Sweatman, and Melendy]{bruno2007thermal}
+Bruno, J.F.; Selig, E.R.; Casey, K.S.; Page, C.A.; Willis, B.L.; Harvell, C.D.;
+  Sweatman, H.; Melendy, A.M.
+\newblock Thermal stress and coral cover as drivers of coral disease outbreaks.
+\newblock {\em PLoS biology} {\bf 2007}, {\em 5},~e124.
+
+\bibitem[Sheng et~al.(2008)Sheng, Provost, and Ipeirotis]{sheng2008get}
+Sheng, V.S.; Provost, F.; Ipeirotis, P.G.
+\newblock Get another label? improving data quality and data mining using
+  multiple, noisy labelers.
+\newblock In Proceedings of the Proceedings of the 14th ACM SIGKDD
+  international conference on Knowledge discovery and data mining,  2008, pp.
+  614--622.
+
+\bibitem[Li et~al.(2020)Li, Knapp, Fabina, Kennedy, Larsen, Lyons, Murray,
+  Phinn, Roelfsema, and Asner]{Li2020}
+Li, J.; Knapp, D.E.; Fabina, N.S.; Kennedy, E.V.; Larsen, K.; Lyons, M.B.;
+  Murray, N.J.; Phinn, S.R.; Roelfsema, C.M.; Asner, G.P.
+\newblock A global coral reef probability map generated using convolutional
+  neural networks.
+\newblock {\em Coral Reefs} {\bf 2020}, {\em 39},~1805--1815.
+\newblock {\url{https://doi.org/10.1007/s00338-020-02005-6}}.
+
+\bibitem[Usama et~al.(2019)Usama, Qadir, Raza, Arif, Yau, Elkhatib, Hussain,
+  and Al-Fuqaha]{usama2019unsupervised}
+Usama, M.; Qadir, J.; Raza, A.; Arif, H.; Yau, K.L.A.; Elkhatib, Y.; Hussain,
+  A.; Al-Fuqaha, A.
+\newblock Unsupervised machine learning for networking: Techniques,
+  applications and research challenges.
+\newblock {\em IEEE access} {\bf 2019}, {\em 7},~65579--65615.
+
+\bibitem[Gordon(1997)]{gordon1997atmospheric}
+Gordon, H.R.
+\newblock Atmospheric correction of ocean color imagery in the Earth Observing
+  System era.
+\newblock {\em Journal of Geophysical Research: Atmospheres} {\bf 1997}, {\em
+  102},~17081--17106.
+
+\bibitem[Zhu and Woodcock(2012)]{Zhe2012}
+Zhu, Z.; Woodcock, C.
+\newblock Object-based cloud and cloud shadow detection in Landsat imagery.
+\newblock {\em Remote Sensing of Environment} {\bf 2012}, {\em 118},~83–94.
+\newblock {\url{https://doi.org/10.1016/j.rse.2011.10.028}}.
+
+\bibitem[Wyszecki and Stiles(2000)]{wyszecki2000color}
+Wyszecki, G.; Stiles, W.S.
+\newblock {\em Color science: concepts and methods, quantitative data and
+  formulae}; Vol.~40, John wiley \& sons,  2000.
+
+\bibitem[Gonzalez~R and Woods(2006)]{gonzalezr2006digital}
+Gonzalez~R, R.; Woods, E.
+\newblock Digital Image Processing, 3rd ed Prentice-Hall Inc.
+\newblock {\em Upper Saddle River, New Jersey} {\bf 2006}.
+
+\bibitem[Siegel et~al.(2000)Siegel, Wang, Maritorena, and
+  Robinson]{siegel2000atmospheric}
+Siegel, D.A.; Wang, M.; Maritorena, S.; Robinson, W.
+\newblock Atmospheric correction of satellite ocean color imagery: the black
+  pixel assumption.
+\newblock {\em Applied optics} {\bf 2000}, {\em 39},~3582--3591.
+
+\bibitem[Pearson(1901)]{pearson1901}
+Pearson, K.
+\newblock LIII. On lines and planes of closest fit to systems of points in
+  space.
+\newblock {\em The London, Edinburgh, and Dublin philosophical magazine and
+  journal of science} {\bf 1901}, {\em 2},~559--572.
+
+\bibitem[Van~der Maaten and Hinton(2008)]{van2008visualizing}
+Van~der Maaten, L.; Hinton, G.
+\newblock Visualizing data using t-SNE.
+\newblock {\em Journal of machine learning research} {\bf 2008}, {\em 9}.
+
+\bibitem[McInnes et~al.(2018)McInnes, Healy, and Melville]{mcinnes2018umap}
+McInnes, L.; Healy, J.; Melville, J.
+\newblock Umap: Uniform manifold approximation and projection for dimension
+  reduction.
+\newblock {\em arXiv preprint arXiv:1802.03426} {\bf 2018}.
+
+\bibitem[MacQueen et~al.(1967)]{macqueen1967some}
+MacQueen, J.;  et~al.
+\newblock Some methods for classification and analysis of multivariate
+  observations.
+\newblock In Proceedings of the Proceedings of the fifth Berkeley symposium on
+  mathematical statistics and probability. Oakland, CA, USA,  1967, Vol.~1, pp.
+  281--297.
+
+\bibitem[Rasmussen(1999)]{rasmussen1999infinite}
+Rasmussen, C.
+\newblock The infinite Gaussian mixture model.
+\newblock {\em Advances in neural information processing systems} {\bf 1999},
+  {\em 12}.
+
+\end{thebibliography}
