@@ -296,26 +296,6 @@ def validate_band_shape(image, bands):
     """
     if len(image.shape) < 3 or image.shape[2] < max(bands) + 1:
         raise ValueError("Invalid band shape in the image array.")
-    
-# from functools import wraps
-
-# def handle_nan_values(func):
-#     @wraps(func)
-#     def wrapper(image, bands=None):
-#         result = func(image, bands)
-#         return np.nan_to_num(result, nan=0.0)
-    
-#     return wrapper
-
-# # Apply the decorator to your functions
-# ci = handle_nan_values(ci)
-# oci = handle_nan_values(oci)
-# ssi = handle_nan_values(ssi)
-# ti = handle_nan_values(ti)
-# wqi = handle_nan_values(wqi)
-# ndci = handle_nan_values(ndci)
-# wbei = handle_nan_values(wbei)
-# bgr = handle_nan_values(bgr)
 
 def calculate_water_surface_index(band_array, bands = None):
     """

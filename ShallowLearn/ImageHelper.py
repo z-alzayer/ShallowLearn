@@ -9,7 +9,7 @@ from ShallowLearn import LoadData
 from matplotlib.colors import ListedColormap, to_rgba
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 
-def load_img(path):
+def load_img(path, return_meta=False):
     """
     Loads an image from the specified path.
 
@@ -21,9 +21,28 @@ def load_img(path):
 
     """
     img = LoadData.LoadGeoTIFF(path).load()
+    
     img = np.swapaxes(img, 0, 2)
     img = np.swapaxes(img, 0, 1)
+    if return_meta:
+        return img, LoadData.LoadGeoTIFF(path).get_metadata()
     return img
+
+def select_channels(arr, indices):
+    """
+    Selects specific channels based on the given indices from a 3D numpy array.
+
+    :param arr: A numpy array of shape (x, y, z).
+    :param indices: A list or array-like containing the indices of channels to be selected.
+                    Its length must be 3 or it will raise a ValueError.
+    :return: A numpy array of shape (x, y, 3).
+    """
+
+    if len(indices) != 3:
+        raise ValueError("The length of indices must be 3.")
+
+    return arr[:, :, indices]
+
 
 def remove_channel(img, channel):
     """
@@ -215,6 +234,7 @@ def apply_mask(data, mask, fill_value=0):
 def generate_multichannel_mask(img, mask=None, mask_val=9):
     """
     Generates a multichannel mask for the input image based on the predicted mask.
+    Can also be used to generate a multichannel mask for a given mask.
 
     Args:
         img (numpy.ndarray): The input image array.
@@ -270,25 +290,6 @@ def plot_histograms(img, plot=True, bins=50, min_value=1):
         plt.title('Histogram of Each Channel')
         plt.legend()
         plt.show()
-
-
-    def standard__minmax_scaler_(img):
-        # Test if this actually helps at a later time 
-
-        # from sklearn.preprocessing import scale, minmax_scale
-        # test_img = LoadData.LoadGeoTIFF(dir_list[1]).load()
-        # test_img = np.swapaxes(test_img, 0, 2)
-        # test_img_original = test_img.copy()
-        # r = np.float16(scale(test_img[:,:,4].flatten(), with_mean=True, with_std=True, copy=True )).reshape(534, 725)
-        # g = np.float16(scale(test_img[:,:,3].flatten(), with_mean=True, with_std=True, copy=True )).reshape(534, 725)
-        # b = np.float16(scale(test_img[:,:,2].flatten(), with_mean=True, with_std=True, copy=True )).reshape(534, 725)
-        # # Ensure the values are positive
-        # r = np.uint8(minmax_scale(r.flatten(),feature_range=(0,255), axis=0, copy=True )).reshape(534, 725)
-        # g = np.uint8(minmax_scale(g.flatten(),feature_range=(0,255), axis=0, copy=True )).reshape(534, 725)
-        # b = np.uint8(minmax_scale(b.flatten(),feature_range=(0,255),  axis=0, copy=True )).reshape(534, 725)
-        # rescaled_img = np.swapaxes(np.array([r,g,b]), 0, 2)
-        pass
-
 
 def discrete_implot(arr, change_labels=None, change_colors=None, pixel_scale=10, title = None, return_fig = False):
     if len(arr.shape) == 1:

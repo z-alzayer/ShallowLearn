@@ -30,12 +30,18 @@ class LoadGeoTIFF(DataLoader):
     """Loads a geotiff directly from a raster accepted by rasterio"""
     def __init__(self, data_source):
         super().__init__(data_source)
-
+        self.metadata = None
+    
     def load(self):
         # Implement the method to load a GeoTIFF file using Rasterio
         with rasterio.open(self.data_source) as src:
             data = src.read()
         return data
+
+    def get_metadata(self):
+        with rasterio.open(self.data_source) as src:
+            self.metadata = src.meta
+        return self.metadata
 
 class LoadFromCSV(DataLoader):
     """This class loads data from a CSV file. The CSV file should contain the file paths of the data to be loaded.

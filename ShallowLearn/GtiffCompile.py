@@ -6,7 +6,9 @@ import numpy as np
 from ShallowLearn.LoadData import LoadGeoTIFF
 from ShallowLearn.FileProcessing import unzip_files, get_file_names_from_zip, delete_files_from_dir, list_files_in_dir, filter_files_by_extension, check_values_in_filenames, order_by_band
 from ShallowLearn.band_mapping import band_mapping
+
 files_to_keep = []
+
 class ImageCompiler():
     """
     Class for compiling a set of images into one multi-band image.

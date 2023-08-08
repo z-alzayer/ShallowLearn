@@ -3,8 +3,8 @@ import numpy as np
 import colorsys
 import math
 from math import pi
-from skimage.color import rgb2lab, lab2rgb
-from ShallowLearn.ImageHelper import plot_lab
+from skimage.color import rgb2lab, lab2rgb, hsv2rgb
+from ShallowLearn.ImageHelper import plot_lab, plot_hsv, generate_multichannel_mask
 
 def BCET(image, min_value=0, max_value=255, desired_mean=110):
     """
@@ -41,7 +41,7 @@ def BCET(image, min_value=0, max_value=255, desired_mean=110):
     return transformed_image.astype(int)  # Ensure the output values are integers for plotting
 
 
-def linear_contrast_enhancement(image):
+def linear_contrast_enhancement(image, max_value=255):
     """
     Applies a Linear Contrast Enhancement (LCE) to an image.
 
@@ -73,7 +73,9 @@ def linear_contrast_enhancement(image):
         raise ValueError("Cannot apply linear contrast enhancement: all pixel values in the image are the same.")
 
     # Apply linear contrast enhancement and clip to keep values within the desired range
-    enhanced_image = np.clip((image - min_intensity) * (255 / (max_intensity - min_intensity)), 0, 255)
+    enhanced_image = np.clip((image - min_intensity) * (max_value / (max_intensity - min_intensity)), 0, max_value)
+
+    enhanced_image[mask_nan] = np.nan  # Replace NaN values with NaN
 
     return enhanced_image
 
@@ -236,3 +238,32 @@ def transform_multiband_lab(arr, bands = None):
     return arr_copy
 
 
+
+def transform_hsv_stretch(array, max_value = 100):
+    """
+    Transform an Image into HSV space and stretch the contrast of the S channel.
+    """
+    
+    hsv_array = plot_hsv(array)
+    hsv_array[:, :, 1] = linear_contrast_enhancement(hsv_array[:, :, 1], max_value = max_value)
+    rgb_array = hsv2rgb(hsv_array)
+    return rgb_array
+
+def transform_multiband_hsv(arr, bands = None, max_value = 100, mask = None):
+    """
+    Reindex the bands of a multiband image to match the order of the HSV color space.
+    Input is a multiband array
+    If bands is None, the default is [3,2,1] - where 3 is the Red band, 2 is the Green band, and 1 is the Blue band.
+    """
+    if bands is None:
+        bands = [3,2,1]
+
+    arr_copy = arr.copy()
+    #convert arr_copy to float64
+    arr_copy = arr_copy.astype(np.float64)
+    rgb_arr = transform_hsv_stretch(arr_copy, max_value = max_value)
+    
+    arr_copy[:,:,bands[0]] = rgb_arr[:,:,0]
+    arr_copy[:,:,bands[1]] = rgb_arr[:,:,1]
+    arr_copy[:,:,bands[2]] = rgb_arr[:,:,2]
+    return arr_copy

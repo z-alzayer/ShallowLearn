@@ -6,19 +6,22 @@ import pkg_resources
 
 
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, RobustScaler, PowerTransformer
+from sklearn.preprocessing import StandardScaler, RobustScaler, PowerTransformer, MinMaxScaler
 from sklearn.impute import SimpleImputer
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.model_selection import GridSearchCV
 from sklearn.mixture import GaussianMixture
 from openTSNE.sklearn import TSNE
+from sklearn.compose import ColumnTransformer
+
 
 from ShallowLearn import LoadData
 from ShallowLearn.band_mapping import band_mapping
+from ShallowLearn.IndiceFeatures import get_feature_order
 
 
-
+PATH = "/media/ziad/Expansion/Cleaned_Data_Directory/"
 
 def preprocess_data(data):
     loaded_data = LoadData.LoadFromCSV(data)
@@ -30,6 +33,65 @@ def reshape_data(data):
     dim_0 = data.shape[0] * data.shape[2] * data.shape[3] 
     channels = data.shape[1]
     return data.reshape(dim_0, channels)
+
+
+def create_dataframe(path = None):
+    """Local dataloader class for the data in the Cleaned_Data_Directory"""
+    features = [i[0] for i in get_feature_order()]
+    features.append("mask")
+    features = list(band_mapping.keys()) + features
+    if path is not None:
+        indices = np.load(os.path.join(path, "indices.npy"))
+        masks = np.load(os.path.join(path, "masks.npy"))
+        images = np.load(os.path.join(path, "imgs.npy"))
+        masks = np.uint8(masks)    
+        data_combined = np.concatenate((images, indices, masks), axis = 3)
+    data_expanded = data_combined.reshape(-1, len(features))
+    df = pd.DataFrame(data_expanded, columns = features).dropna()
+    return df
+
+class TrainPreprocess():
+    # Just basic class for preprocessing data
+    def __init__(self):
+        power_transformer_columns = ['B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B8A', 'B09', 'B10', 'B11', 'B12','calculate_water_surface_index']
+        standard_scaler_columns = ['bgr', 'ci', 'ndci', 'oci', 'ssi', 'ti', 'wqi']
+        minmax_scaler_columns = ['B01', 'calculate_pseudo_subsurface_depth']
+        # passthrough_columns = ['mask']
+        # Create transformers
+        power_transformer_transformer = ('power_transformer', PowerTransformer(), power_transformer_columns)
+        standard_scaler_transformer = ('standard_scaler', StandardScaler(), standard_scaler_columns)
+        minmax_scaler_transformer = ('minmax_scaler', MinMaxScaler(), minmax_scaler_columns)
+        # passthrough_transformer = ('passthrough', 'passthrough', passthrough_columns)
+        # Initialize ColumnTransformer
+        preprocessor = ColumnTransformer(
+            transformers=[
+                power_transformer_transformer,
+                standard_scaler_transformer,
+                minmax_scaler_transformer
+                # passthrough_transformer
+            ]
+        )
+
+        # Initialize Pipeline
+        print("initializing pipeline")
+        pipeline = Pipeline(steps=[('preprocessor', preprocessor)])
+        df = create_dataframe(PATH)
+        print("created dataframe")
+        # drop values in df where mask is 0
+        df = df.loc[df['mask'] == 1]
+        print("dropped mask values")
+        # drop mask column
+        df = df.drop(columns = ['mask'])
+        print("dropped mask column")
+        # Fit the pipeline to the training data
+        pipeline.fit(df)
+        print("fit pipeline")
+        import joblib
+        # Save pipeline
+        print("saving pipeline")
+        joblib.dump(pipeline, '/home/ziad/Documents/Github/ShallowLearn/Models/preproc_pipeline.pkl')
+
+
 
 class TrainOnFullReefs():
 
@@ -94,5 +156,6 @@ class TrainOnFullReefs():
             scaler = StandardScaler()
             imputer = SimpleImputer(strategy='mean')
 if __name__ == "__main__":
-    TrainOnFullReefs()
+    # TrainOnFullReefs()
     # TrainOnFullReefs.TrainOnLABSpace()
+    TrainPreprocess()

@@ -67,6 +67,29 @@ def filter_files_by_extension(file_list, extension):
     """
     return [f for f in file_list if os.path.splitext(f)[1] == extension]
 
+def check_in_string(input_string, extension=None, other_string=None):
+    """
+    Checks if a string ends with a specific extension and contains a specific substring.
+
+    Parameters:
+    - input_string (str): The string to check.
+    - extension (str): The extension to check for.
+    - other_string (str): The substring to check for.
+    
+    """
+    extension_present = False
+    other_string_present = False
+
+    if extension is not None:
+        extension_present = input_string.endswith(extension)
+
+    if other_string is not None:
+        other_string_present = other_string in input_string
+
+    return extension_present and (other_string_present if other_string is not None else True)
+
+
+
 def check_values_in_filenames(file_list, values):
     """
     Checks if any of the provided values are found in the names of the files.
