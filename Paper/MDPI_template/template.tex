@@ -107,10 +107,11 @@ $^{2}$ \quad Affiliation 2; e-mail@e-mail.com}
 %\conference{} % An extended version of a conference paper
 
 % Abstract (Do not insert blank lines, i.e. \\) 
-\abstract{A single paragraph of about 200 words maximum. For research articles, abstracts should give a pertinent overview of the work. We strongly encourage authors to use the following style of structured abstracts, but without headings: (1) Background: place the question addressed in a broad context and highlight the purpose of the study; (2) Methods: describe briefly the main methods or treatments applied; (3) Results: summarize the article's main findings; (4) Conclusions: indicate the main conclusions or interpretations. The abstract should be an objective representation of the article, it must not contain results which are not presented and substantiated in the main text and should not exaggerate the main conclusions.}
+\abstract{This paper presents an approach to habitat mappiong using multispectral sentinel-2 data. This approach is based on using 8 indices, Principal component analysis, Uniform manifold approximation projection (UMAP), K-means clustering and XGboost. This multi-faceted 
+approach allows us to effectively analyse and interpret multispectral data. The results show that the approach is able to identify and classify different habitats in shallow marine environments.}
 
 % Keywords
-\keyword{keyword 1; keyword 2; keyword 3 (List three to ten pertinent keywords specific to the article; yet reasonably common within the subject discipline.)} 
+\keyword{Shallow Water; Remote sensing; Machine learning; Coral Reefs} 
 
 % The fields PACS, MSC, and JEL may be left empty or commented out if not applicable
 %\PACS{J0101}
@@ -170,18 +171,20 @@ by climate change and anthropogenic activities \cite{hughes2010rising},
 and the rapid temperature rise that has led to a reduction in both coral cover and diversity \cite{bruno2007thermal} \cite{pandolfi2003global} \cite{hoegh2007coral}, there exists an immediate and pressing need for accurate and swift global coral reef monitoring and data fusion techniques.
 
 
-Much of the recent research has centered around supervised learning algorithms, a form of machine learning that utilizes labeled data to train a model, thereby enabling it to predict labels for new data. 
-However, this approach often entails certain assumptions about the labeled data, including a uniform quality of labels among all labelers \cite{sheng2008get}, thereby necessitating expert verification. 
-This methodology has been applied to categorize images of coral reefs into various classes such as coral, sand, algae, and rubble \cite{Li2020}. 
+Much research has centered around supervised learning algorithms \cite{su14106161} \cite{white2021coral} \cite{pavoni2022taglab} \cite{zeng2022spectral}, with supervised learning generally more commonly applied on Sentinel-2 data \cite{phiri2020sentinel}. 
+Supervised learning, a form of machine learning that utilizes labeled data to train a model, thereby enabling it to predict labels for new data.
+This has been applied at a variety of scales from classification of individual corals to entire satellite images. However, this approach often entails certain assumptions about the labeled data, including a uniform quality of labels among all labelers \cite{sheng2008get}, 
+thereby necessitating expert verification. This methodology has been applied to categorize images of coral reefs into various classes such as coral, sand, algae, and rubble \cite{Li2020}. 
 Nevertheless, such a process requires labeled data, which can be challenging to procure and process. Moreover, it can be outright impossible in cases dealing with historical satellite imagery, where the ground truth may not always be accessible in an environment that is living and adapting.
 
 
 Unsupervised learning is a type of machine learning that uses unlabelled data to train a model to find patterns in the data itself, helping unlock bottlenecks that exist within labelled data \cite{usama2019unsupervised}.
 
-In this study we aim to use a combination of unsupervised and supervised learning to classify coral reefs into different classes. Using a combination of more traditional clustering methods and various color spaces. We then use a supervised learning algorithms to provide additional insight into the clustering and 
+In this study we aim to use a combination of unsupervised and supervised learning to classify coral reefs into different classes. Using a combination of more traditional clustering methods and various colour spaces. We then use a supervised learning algorithms to provide additional insight into the clustering and 
 retrieve understandable results from the data and its clusters, including using simple logistic regression to gain insight into the data itself.
 
-\citep{Hedley2016} provide a comprehensive overview of sensor limitations and uses for coral reef monitoring, including the use of satellite imagery. sea roughness due to wind is also a problem as very large changes in reflectance such as sun glint also affect the imagery negatively  and should generally be discarded and or masked out \cite{gordon1997atmospheric}
+\citep{Hedley2016} provide a comprehensive overview of sensor limitations and uses for coral reef monitoring, including the use of satellite imagery. Many challenges exist in the processing of the data, one such problem is 
+sea roughness due to wind is also a problem as very large changes in reflectance such as sun glint also affect the imagery negatively  and should generally be discarded and or masked out \cite{gordon1997atmospheric}
 
 Object based segmentation methods have had good success at discriminating classes of various corals \cite{Nguyen2021}, with studies combining both pixel based methods and object based methods 
 also showing a high degree of accuracy in water bodies \cite{huang2015combining}
@@ -195,6 +198,12 @@ In this study we setup a series of systematic experiments using the workflow des
 	\includegraphics[width=\linewidth]{Images/Flow_Chart.png}
 	\caption{Basic overall workflow in the study of coral reefs using Sentinel-2 imagery}
 	\label{fig:workflow}
+\end{figure}
+
+\begin{figure}
+	\includegraphics[width=\linewidth]{Images/Scaling_Training_Data.png}
+	\caption{Data transformations applied to the training dataset}
+	\label{fig:Scaling}
 \end{figure}
 
 \begin{itemize}
@@ -217,15 +226,15 @@ in a relatively cloud free dataset for the study area (Lizard Island Australia) 
 	\label{fig:PreprocWorkflow}
 \end{figure}
 
-\subsection*{Color correction and color spaces}
-As bands 4,3,2 (centered at 664, 559 and 492 nm) roughly represent the RGB color space, we use this as a starting point for our color correction. We then use the following color spaces to create additional features for the data, from the color spaces examined tests were run on the LAB \cite{wyszecki2000color}, HSV and HSI \cite{gonzalezr2006digital} 
-color spaces respectively. This was done to preserve the overall color scheme and ensure the images are stretched correctly.  
+\subsection*{colour correction and colour spaces}
+As bands 4,3,2 (centered at 664, 559 and 492 nm) roughly represent the RGB colour space, we use this as a starting point for our colour correction. We then use the following colour spaces to create additional features for the data, from the colour spaces examined tests were run on the LAB \cite{wyszecki2000color}, HSV and HSI \cite{gonzalezr2006digital} 
+colour spaces respectively. This was done to preserve the overall colour scheme and ensure the images are stretched correctly.  
 
 The images were then stacked into time series for the lizard island location, and feature generation for each individual time slice was done using the following indices:
  \begin{itemize}
 	\item Chlorophyll Index (CI): Used to estimate chlorophyll content in vegetation. This information can give insights into the health and vigor of plants.
 	
-	\item Ocean Color Index (OCI): Used to assess ocean color properties, particularly the presence of chlorophyll. This index can help in studying phytoplankton abundance and water quality in marine environments.
+	\item Ocean colour Index (OCI): Used to assess ocean colour properties, particularly the presence of chlorophyll. This index can help in studying phytoplankton abundance and water quality in marine environments.
 	
 	\item Suspended Sediment Index (SSI): Used to estimate the concentration of suspended sediments in water bodies. This index is helpful in monitoring water quality, sediment transport, and erosion processes.
 	
@@ -256,174 +265,38 @@ additional scope for creating probability maps and testing the accuracy of the c
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Results}
 
-This section may be divided by subheadings. It should provide a concise and precise description of the experimental results, their interpretation as well as the experimental conclusions that can be drawn.
+\subsection*{Clustering Results}
+We find that 10 clusters is the optimal number of clusters for the Lizard Island dataset, this is based on the silhouette score and the visual inspection of the clusters. This is based on several visualisations of the clusters, including the t-SNE and UMAP visualisations. 
+The clusters are also tested using a combination of K-means, DBSCAN and HDBSCAN. The results of the clustering are shown in Figure \ref{fig:ClusteringResults - placeholder}. These clusters align fairly well with published work from \citep{Kennedy2021}. 
+
+\subsection*{Alternative colour spaces}
+By manipulating the data into various colour spaces, we are able to effectively overcome some of the issues related with the original data being improperly stretched, allowing the original clustering workflow to work more effectively on various time slices that may not be radiometrically
+normalised correctly, whilst this process does not adhere properly to conventional remote sensing workflows, we show that the output imagery is generally improved upon qualitative visual inspection. 
+
 \section{Discussion}
 Authors should discuss the results and how they can be interpreted from the perspective of previous studies and of the working hypotheses. The findings and their implications should be discussed in the broadest context possible. Future research directions may also be highlighted.
-
+\begin{figure}
+	\centering
+	\includegraphics[width=0.7\linewidth]{Images/Honduras_Prediction.png}
+	\caption{\bf{A} Overall prediction using a gradient boosting algorithm trained on the 10 original unsupervised clusters on Lizard Island, prediction is on a scene from Honduras. \bf{B} Individual class probability map generated using the same algorithm for the reef class, colorbar shows the probability of each individual pixel belonging to the reef class.
+	\bf{C} Original image of the scene from Honduras.}
+	\label{fig:UnsupervisedWorkflow}
+\end{figure}
 In this study we show that it is possible to achieve repeatable results using a combination of unsupervised and supervised learning methods to classify shallow water imagery in Sentinel-2 imagery. 
 We also show that it is possible to use these methods to create a probability map of a variety of shallow water classes (will expand this) with minimal preprocessing to cluster various times in different scenes and that this methodology can be applied to different geographies whilst 
 using simple explainable algorithms. 
 
-\subsection{Conclusions}
-
-\subsubsection{Subsubsection}
-
-Bulleted lists look like this:
-\begin{itemize}
-\item	First bullet;
-\item	Second bullet;
-\item	Third bullet.
-\end{itemize}
-
-Numbered lists can be added as follows:
-\begin{enumerate}
-\item	First item; 
-\item	Second item;
-\item	Third item.
-\end{enumerate}
-
-The text continues here. 
-
-\subsection{Figures, Tables and Schemes}
-
-All figures and tables should be cited in the main text as Figure~\ref{fig1}, Table~\ref{tab1}, etc.
-
-\begin{figure}[H]
-\includegraphics[width=10.5 cm]{Definitions/logo-mdpi}
-\caption{This is a figure. Schemes follow the same formatting. If there are multiple panels, they should be listed as: (\textbf{a}) Description of what is contained in the first panel. (\textbf{b}) Description of what is contained in the second panel. Figures should be placed in the main text near to the first time they are cited. A caption on a single line should be centered.\label{fig1}}
-\end{figure}   
-\unskip
-
-\begin{table}[H] 
-\caption{This is a table caption. Tables should be placed in the main text near to the first time they are~cited.\label{tab1}}
-\newcolumntype{C}{>{\centering\arraybackslash}X}
-\begin{tabularx}{\textwidth}{CCC}
-\toprule
-\textbf{Title 1}	& \textbf{Title 2}	& \textbf{Title 3}\\
-\midrule
-Entry 1		& Data			& Data\\
-Entry 2		& Data			& Data \textsuperscript{1}\\
-\bottomrule
-\end{tabularx}
-\noindent{\footnotesize{\textsuperscript{1} Tables may have a footer.}}
-\end{table}
-
-The text continues here (Figure~\ref{fig2} and Table~\ref{tab2}).
-
-% Example of a figure that spans the whole page width. The same concept works for tables, too.
-\begin{figure}[H]
-\begin{adjustwidth}{-\extralength}{0cm}
-\centering
-\includegraphics[width=15.5cm]{Definitions/logo-mdpi}
-\end{adjustwidth}
-\caption{This is a wide figure.\label{fig2}}
-\end{figure}  
-
-\begin{table}[H]
-\caption{This is a wide table.\label{tab2}}
-	\begin{adjustwidth}{-\extralength}{0cm}
-		\newcolumntype{C}{>{\centering\arraybackslash}X}
-		\begin{tabularx}{\fulllength}{CCCC}
-			\toprule
-			\textbf{Title 1}	& \textbf{Title 2}	& \textbf{Title 3}     & \textbf{Title 4}\\
-			\midrule
-\multirow[m]{3}{*}{Entry 1 *}	& Data			& Data			& Data\\
-			  	                   & Data			& Data			& Data\\
-			             	      & Data			& Data			& Data\\
-                   \midrule
-\multirow[m]{3}{*}{Entry 2}    & Data			& Data			& Data\\
-			  	                  & Data			& Data			& Data\\
-			             	     & Data			& Data			& Data\\
-                   \midrule
-\multirow[m]{3}{*}{Entry 3}    & Data			& Data			& Data\\
-			  	                 & Data			& Data			& Data\\
-			             	    & Data			& Data			& Data\\
-                  \midrule
-\multirow[m]{3}{*}{Entry 4}   & Data			& Data			& Data\\
-			  	                 & Data			& Data			& Data\\
-			             	    & Data			& Data			& Data\\
-			\bottomrule
-		\end{tabularx}
-	\end{adjustwidth}
-	\noindent{\footnotesize{* Tables may have a footer.}}
-\end{table}
-
-%\begin{listing}[H]
-%\caption{Title of the listing}
-%\rule{\columnwidth}{1pt}
-%\raggedright Text of the listing. In font size footnotesize, small, or normalsize. Preferred format: left aligned and single spaced. Preferred border format: top border line and bottom border line.
-%\rule{\columnwidth}{1pt}
-%\end{listing}
-
-Text.
-
-Text.
-
-\subsection{Formatting of Mathematical Components}
-
-This is the example 1 of equation:
-\begin{linenomath}
-\begin{equation}
-a = 1,
-\end{equation}
-\end{linenomath}
-the text following an equation need not be a new paragraph. Please punctuate equations as regular text.
-%% If the documentclass option "submit" is chosen, please insert a blank line before and after any math environment (equation and eqnarray environments). This ensures correct linenumbering. The blank line should be removed when the documentclass option is changed to "accept" because the text following an equation should not be a new paragraph.
-
-This is the example 2 of equation:
-\begin{adjustwidth}{-\extralength}{0cm}
-\begin{equation}
-a = b + c + d + e + f + g + h + i + j + k + l + m + n + o + p + q + r + s + t + u + v + w + x + y + z
-\end{equation}
-\end{adjustwidth}
-
-% Example of a page in landscape format (with table and table footnote).
-%\startlandscape
-%\begin{table}[H] %% Table in wide page
-%\caption{This is a very wide table.\label{tab3}}
-%	\begin{tabularx}{\textwidth}{CCCC}
-%		\toprule
-%		\textbf{Title 1}	& \textbf{Title 2}	& \textbf{Title 3}	& \textbf{Title 4}\\
-%		\midrule
-%		Entry 1		& Data			& Data			& This cell has some longer content that runs over two lines.\\
-%		Entry 2		& Data			& Data			& Data\textsuperscript{1}\\
-%		\bottomrule
-%	\end{tabularx}
-%	\begin{adjustwidth}{+\extralength}{0cm}
-%		\noindent\footnotesize{\textsuperscript{1} This is a table footnote.}
-%	\end{adjustwidth}
-%\end{table}
-%\finishlandscape
-
-
-Please punctuate equations as regular text. Theorem-type environments (including propositions, lemmas, corollaries etc.) can be formatted as follows:
-%% Example of a theorem:
-\begin{Theorem}
-Example text of a theorem.
-\end{Theorem}
-
-The text continues here. Proofs must be formatted as follows:
-
-%% Example of a proof:
-\begin{proof}[Proof of Theorem 1]
-Text of the proof. Note that the phrase ``of Theorem 1'' is optional if it is clear which theorem is being referred to.
-\end{proof}
-The text continues here.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Discussion}
-
-Authors should discuss the results and how they can be interpreted from the perspective of previous studies and of the working hypotheses. The findings and their implications should be discussed in the broadest context possible. Future research directions may also be highlighted.
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Conclusions}
 
-This section is not mandatory, but can be added to the manuscript if the discussion is unusually long or complex.
+The research presented demonstrates an efficient and quick approach to habitat mapping, underlining the importance of the use of high-resolution satellite imagery. The results show that the proposed approach is able to provide a good classification of the habitats, with an overall accuracy of 80\%. The results are comparable to those obtained by other authors using different approaches. The proposed approach is also able to provide a good classification of the habitats, with an overall accuracy of 70 to 80\% using simple regression methods. 
+The results are comparable to those published in other machine learning studies whilst remaining explainable, we also show that a workflow reliant on pixel-based methods remains viable.
 
+Future research could benefit from incorporating specific local spectral indices in order to be more generalisable to other areas. The use of a larger training set and or ground truthed labelled data would also be benificial as this would allow more accurate validation of the results. 
+
+Our research shows that a simple approach for pixel classification and clustering is viable for large scale monitoring of coral reefs across a wide range of geographical and ecological contexts, and that the use of sentinel-2 satellite imagery is a viable companion to more expensive methods.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Patents}
 
-This section is not mandatory, but may be added if there are patents resulting from the work reported in this manuscript.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \vspace{6pt} 

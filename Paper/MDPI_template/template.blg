@@ -2,7 +2,7 @@ This is BibTeX, Version 0.99d (TeX Live 2022/dev/Debian)
 Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
 The top-level auxiliary file: template.aux
 The style file: Definitions/mdpi.bst
-Illegal, another \bibstyle command---line 76 of file template.aux
+Illegal, another \bibstyle command---line 71 of file template.aux
  : \bibstyle
  :          {plainnat}
 I'm skipping whatever remains of this command
@@ -10,45 +10,45 @@ Database file #1: export.bib
 Warning--entry type for "Hedley2016" isn't style-file defined
 --line 1227 of file export.bib
 Warning--can't use both volume and number fields in macqueen1967some
-You've used 20 entries,
+You've used 30 entries,
             2885 wiz_defined-function locations,
-            709 strings with 8283 characters,
-and the built_in function-call counts, 7975 in all, are:
-= -- 694
-> -- 463
-< -- 15
-+ -- 207
-- -- 124
-* -- 682
-:= -- 1214
-add.period$ -- 61
-call.type$ -- 20
-change.case$ -- 20
-chr.to.int$ -- 20
-cite$ -- 20
-duplicate$ -- 372
-empty$ -- 645
-format.name$ -- 169
-if$ -- 1677
+            768 strings with 11168 characters,
+and the built_in function-call counts, 13219 in all, are:
+= -- 1088
+> -- 962
+< -- 16
++ -- 422
+- -- 261
+* -- 1188
+:= -- 2054
+add.period$ -- 95
+call.type$ -- 30
+change.case$ -- 30
+chr.to.int$ -- 30
+cite$ -- 30
+duplicate$ -- 564
+empty$ -- 971
+format.name$ -- 326
+if$ -- 2745
 int.to.chr$ -- 1
-int.to.str$ -- 20
-missing$ -- 20
-newline$ -- 101
-num.names$ -- 58
-pop$ -- 183
+int.to.str$ -- 30
+missing$ -- 30
+newline$ -- 154
+num.names$ -- 88
+pop$ -- 280
 preamble$ -- 0
-purify$ -- 20
+purify$ -- 30
 quote$ -- 0
-skip$ -- 245
+skip$ -- 418
 stack$ -- 0
-substring$ -- 391
-swap$ -- 90
-text.length$ -- 4
+substring$ -- 567
+swap$ -- 133
+text.length$ -- 5
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 134
+type$ -- 204
 warning$ -- 1
-while$ -- 63
+while$ -- 97
 width$ -- 0
-write$ -- 241
+write$ -- 369
 (There was 1 error message)

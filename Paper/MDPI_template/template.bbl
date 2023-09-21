@@ -40,6 +40,61 @@ Bruno, J.F.; Selig, E.R.; Casey, K.S.; Page, C.A.; Willis, B.L.; Harvell, C.D.;
 \newblock Thermal stress and coral cover as drivers of coral disease outbreaks.
 \newblock {\em PLoS biology} {\bf 2007}, {\em 5},~e124.
 
+\bibitem[Pandolfi et~al.(2003)Pandolfi, Bradbury, Sala, Hughes, Bjorndal,
+  Cooke, McArdle, McClenachan, Newman, Paredes, et~al.]{pandolfi2003global}
+Pandolfi, J.M.; Bradbury, R.H.; Sala, E.; Hughes, T.P.; Bjorndal, K.A.; Cooke,
+  R.G.; McArdle, D.; McClenachan, L.; Newman, M.J.; Paredes, G.;  et~al.
+\newblock Global trajectories of the long-term decline of coral reef
+  ecosystems.
+\newblock {\em Science} {\bf 2003}, {\em 301},~955--958.
+
+\bibitem[Hoegh-Guldberg et~al.(2007)Hoegh-Guldberg, Mumby, Hooten, Steneck,
+  Greenfield, Gomez, Harvell, Sale, Edwards, Caldeira, et~al.]{hoegh2007coral}
+Hoegh-Guldberg, O.; Mumby, P.J.; Hooten, A.J.; Steneck, R.S.; Greenfield, P.;
+  Gomez, E.; Harvell, C.D.; Sale, P.F.; Edwards, A.J.; Caldeira, K.;  et~al.
+\newblock Coral reefs under rapid climate change and ocean acidification.
+\newblock {\em science} {\bf 2007}, {\em 318},~1737--1742.
+
+\bibitem[Boonnam et~al.(2022)Boonnam, Udomchaipitak, Puttinaovarat, Chaichana,
+  Boonjing, and Muangprathub]{su14106161}
+Boonnam, N.; Udomchaipitak, T.; Puttinaovarat, S.; Chaichana, T.; Boonjing, V.;
+  Muangprathub, J.
+\newblock Coral Reef Bleaching under Climate Change: Prediction Modeling and
+  Machine Learning.
+\newblock {\em Sustainability} {\bf 2022}, {\em 14}.
+\newblock {\url{https://doi.org/10.3390/su14106161}}.
+
+\bibitem[White et~al.(2021)White, Amani, and Mohseni]{white2021coral}
+White, E.; Amani, M.; Mohseni, F.
+\newblock Coral reef mapping using remote sensing techniques and a supervised
+  classification algorithm.
+\newblock {\em Advances in Environmental and Engineering Research} {\bf 2021},
+  {\em 2},~1--13.
+
+\bibitem[Pavoni et~al.(2022)Pavoni, Corsini, Ponchio, Muntoni, Edwards,
+  Pedersen, Sandin, and Cignoni]{pavoni2022taglab}
+Pavoni, G.; Corsini, M.; Ponchio, F.; Muntoni, A.; Edwards, C.; Pedersen, N.;
+  Sandin, S.; Cignoni, P.
+\newblock TagLab: AI-assisted annotation for the fast and accurate semantic
+  segmentation of coral reef orthoimages.
+\newblock {\em Journal of field robotics} {\bf 2022}, {\em 39},~246--262.
+
+\bibitem[Zeng et~al.(2022)Zeng, Hochberg, Candela, and
+  Wettergreen]{zeng2022spectral}
+Zeng, R.; Hochberg, E.J.; Candela, A.; Wettergreen, D.S.
+\newblock Spectral Unmixing And Mapping Of Coral Reef Benthic Cover With Deep
+  Learning.
+\newblock In Proceedings of the 2022 12th Workshop on Hyperspectral Imaging and
+  Signal Processing: Evolution in Remote Sensing (WHISPERS). IEEE,  2022, pp.
+  1--5.
+
+\bibitem[Phiri et~al.(2020)Phiri, Simwanda, Salekin, Nyirenda, Murayama, and
+  Ranagalage]{phiri2020sentinel}
+Phiri, D.; Simwanda, M.; Salekin, S.; Nyirenda, V.R.; Murayama, Y.; Ranagalage,
+  M.
+\newblock Sentinel-2 data for land cover/use mapping: A review.
+\newblock {\em Remote Sensing} {\bf 2020}, {\em 12},~2291.
+
 \bibitem[Sheng et~al.(2008)Sheng, Provost, and Ipeirotis]{sheng2008get}
 Sheng, V.S.; Provost, F.; Ipeirotis, P.G.
 \newblock Get another label? improving data quality and data mining using
@@ -71,6 +126,20 @@ Gordon, H.R.
   System era.
 \newblock {\em Journal of Geophysical Research: Atmospheres} {\bf 1997}, {\em
   102},~17081--17106.
+
+\bibitem[Nguyen et~al.(2021)Nguyen, Liquet, Mengersen, and Sous]{Nguyen2021}
+Nguyen, T.; Liquet, B.; Mengersen, K.; Sous, D.
+\newblock Mapping of Coral Reefs with Multispectral Satellites: A Review of
+  Recent Papers.
+\newblock {\em Remote Sensing} {\bf 2021}, {\em 13}.
+\newblock {\url{https://doi.org/10.3390/rs13214470}}.
+
+\bibitem[Huang et~al.(2015)Huang, Xie, Fang, and Zhang]{huang2015combining}
+Huang, X.; Xie, C.; Fang, X.; Zhang, L.
+\newblock Combining pixel-and object-based machine learning for identification
+  of water-body types from urban high-resolution remote-sensing imagery.
+\newblock {\em IEEE Journal of Selected Topics in Applied Earth Observations
+  and Remote Sensing} {\bf 2015}, {\em 8},~2097--2110.
 
 \bibitem[Zhu and Woodcock(2012)]{Zhe2012}
 Zhu, Z.; Woodcock, C.
@@ -126,5 +195,15 @@ Rasmussen, C.
 \newblock The infinite Gaussian mixture model.
 \newblock {\em Advances in neural information processing systems} {\bf 1999},
   {\em 12}.
+
+\bibitem[Kennedy et~al.(2021)Kennedy, Roelfsema, Lyons, Kovacs,
+  Borrego-Acevedo, Roe, Phinn, Larsen, Murray, Yuwono, Wolff, and
+  Tudman]{Kennedy2021}
+Kennedy, E.V.; Roelfsema, C.M.; Lyons, M.B.; Kovacs, E.M.; Borrego-Acevedo, R.;
+  Roe, M.; Phinn, S.R.; Larsen, K.; Murray, N.J.; Yuwono, D.;  et~al.
+\newblock Reef Cover, a coral reef classification for global habitat mapping
+  from remote sensing.
+\newblock {\em Scientific Data} {\bf 2021}, {\em 8}.
+\newblock {\url{https://doi.org/10.1038/s41597-021-00958-z}}.
 
 \end{thebibliography}
