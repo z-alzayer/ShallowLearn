@@ -24,8 +24,9 @@ def load_img(path, return_meta=False):
     
     img = np.swapaxes(img, 0, 2)
     img = np.swapaxes(img, 0, 1)
+
     if return_meta:
-        return img, LoadData.LoadGeoTIFF(path).get_metadata()
+        return img, LoadData.LoadGeoTIFF(path).get_metadata(), LoadData.LoadGeoTIFF(path).get_bounds()
     return img
 
 def select_channels(arr, indices):
@@ -339,3 +340,123 @@ def discrete_implot(arr, change_labels=None, change_colors=None, pixel_scale=10,
     if return_fig:
         return fig
     plt.show()
+label_dict = {}  # Global dictionary to ensure label consistency between plots
+
+def discrete_implotv2(arr, ax=None, change_labels=None, change_colors=None, pixel_scale=10, title=None, return_fig=False):
+    global label_dict
+
+    if len(arr.shape) == 1:
+        arr = np.reshape(arr, (-1, 1))  # Reshape 1D array to 2D
+
+    if not label_dict:
+        unique_labels = np.unique(arr)
+        label_to_int = {label: i for i, label in enumerate(unique_labels)}
+        label_dict = label_to_int  # Store the label dictionary for future reference
+    else:
+        label_to_int = label_dict  # Use existing label dictionary
+
+    int_arr = np.vectorize(label_to_int.get)(arr)  # Convert labels to integers
+    
+    num_labels = len(label_to_int)
+
+    # Create color list using the 'viridis' colormap
+    colors = plt.get_cmap('viridis')(np.linspace(0, 1, num_labels))
+    
+    # If change_labels and change_colors are specified, modify the corresponding colors
+    if change_labels is not None and change_colors is not None:
+        for label, color in zip(change_labels, change_colors):
+            if label in label_to_int:
+                colors[label_to_int[label]] = to_rgba(color)
+            else:
+                print(f"Label {label} not found in array.")
+
+    cmap = ListedColormap(colors)
+
+    if ax is None:
+        fig, ax = plt.subplots()
+        show_plot = True
+    else:
+        fig = ax.figure
+        show_plot = False
+
+    im = ax.imshow(int_arr, cmap=cmap)
+
+    # Create a colorbar with discrete levels
+    cbar = fig.colorbar(im, ax=ax, ticks=np.arange(num_labels), drawedges=True)
+    cbar.set_label('Labels')
+    cbar.set_ticklabels(list(label_to_int.keys()))  # Set the tick labels using label_dict
+
+    # Add scale bar of 1 km
+    scalebar = AnchoredSizeBar(ax.transData,
+                               10 * pixel_scale, '1 km', 'lower right', 
+                               pad=0.25,
+                               color='white',
+                               frameon=False,
+                               size_vertical=1)
+    ax.add_artist(scalebar)
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    if title is not None:
+        ax.set_title(title)
+    else:
+        ax.set_title('Discrete Plot')
+    if return_fig:
+        return fig
+    if show_plot:
+        plt.show()
+def add_north_arrow(ax, relative_position=(0.05, 0.05), arrow_length=0.05, text_offset=-0.02):
+    """Add a north arrow to the axis."""
+    xlim, ylim = ax.get_xlim(), ax.get_ylim()
+    
+    x = xlim[0] + (xlim[1] - xlim[0]) * relative_position[0]
+    y = ylim[0] + (ylim[1] - ylim[0]) * relative_position[1]
+    
+    ax.arrow(x, y, 0, arrow_length, head_width=0.02 * (xlim[1] - xlim[0]), head_length=0.03 * (ylim[1] - ylim[0]), fc='black', ec='black')
+    ax.text(x, y + text_offset * (ylim[1] - ylim[0]), 'N', horizontalalignment='center', verticalalignment='center', fontsize=12, fontweight='bold', c = 'black')
+
+
+def plot_geotiff(image_data, bounds, title="Map with coordinates", ax = None):
+    """
+    Plot GeoTIFF with UTM Coordinates and a scale bar.
+
+    Parameters:
+    - image_data: 2D or 3D array containing the raster data
+    - bounds: Tuple containing the bounding coordinates (left, right, bottom, top)
+    """
+    from matplotlib_scalebar.scalebar import ScaleBar
+    from matplotlib.ticker import ScalarFormatter
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 10))
+    left, bottom, right, top = bounds
+
+    # If the image data is RGB and contains NaN values, convert it to RGBA
+    if image_data.ndim == 3 and image_data.shape[2] == 3 and np.isnan(image_data).any():
+        # Create an alpha channel with the same shape as one of the RGB channels
+        alpha = np.ones_like(image_data[..., 0])
+
+        # Where any of the RGB channels is NaN, set the alpha to 0
+        alpha[np.isnan(image_data).any(axis=-1)] = 0
+
+        # Create an RGBA image by stacking the RGB channels and the alpha channel along the last dimension
+        image_data = np.dstack((image_data, alpha))
+
+    ax.imshow(image_data, extent=[left, right, bottom, top])  # Adjust colormap as needed for non-RGBA data
+
+    # Use ScalarFormatter to force no scientific notation
+    formatter = ScalarFormatter()
+    formatter.set_scientific(False)
+    ax.xaxis.set_major_formatter(formatter)
+    ax.yaxis.set_major_formatter(formatter)
+
+    # Add a scale bar
+    scalebar = ScaleBar(2, location='lower right', scale_loc='bottom', box_alpha=0)  # 1 pixel = 1 meter (assuming your image_data is in meters)
+    ax.add_artist(scalebar)
+
+    add_north_arrow(ax)
+
+    ax.set_title(title)
+    ax.set_xlabel("Easting (m)")
+    ax.set_ylabel("Northing (m)")
+    

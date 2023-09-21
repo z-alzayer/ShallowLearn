@@ -31,17 +31,26 @@ class LoadGeoTIFF(DataLoader):
     def __init__(self, data_source):
         super().__init__(data_source)
         self.metadata = None
+        self.bounds = None
     
     def load(self):
         # Implement the method to load a GeoTIFF file using Rasterio
         with rasterio.open(self.data_source) as src:
             data = src.read()
+            no_data = src.nodatavals
+            masked_data = np.ma.masked_array(data, mask=[band_data == nodata for band_data, nodata in zip(data, no_data)])
         return data
 
     def get_metadata(self):
         with rasterio.open(self.data_source) as src:
             self.metadata = src.meta
         return self.metadata
+
+    
+    def get_bounds(self):
+        with rasterio.open(self.data_source) as src:
+            self.bounds = src.bounds
+        return self.bounds
 
 class LoadFromCSV(DataLoader):
     """This class loads data from a CSV file. The CSV file should contain the file paths of the data to be loaded.

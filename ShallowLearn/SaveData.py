@@ -11,10 +11,13 @@ from ShallowLearn.FileProcessing import check_in_string
 class GenerateIndicesPerTimeSeries():
     """Helper class that generates indices, masks and images for a time series of sentinel-2 tiff images."""
     
-    def __init__(self, path, tag = None, save = True):
+    def __init__(self, path, tag = None, save = True, imgs = None):
         self.path = path
         self.tag = tag
-        self.imgs = self.get_imgs(self.tag)
+        if imgs is not None:
+            self.imgs = imgs
+        else:
+            self.imgs = self.get_imgs(self.tag)
         self.indices = self.generate_indices()
         self.masks = self.generate_masks()
         
@@ -66,4 +69,4 @@ class GenerateIndicesPerTimeSeries():
 if __name__ == "__main__":
     path = "/media/ziad/Expansion/Cleaned_Data_Directory/"
     
-    GenerateIndicesPerTimeSeries(path, "6880")
+    GenerateIndicesPerTimeSeries(path, "6880", imgs = np.load(path + "radiometrically_normalized.npy"))

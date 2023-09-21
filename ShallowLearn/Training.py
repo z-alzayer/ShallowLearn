@@ -36,7 +36,9 @@ def reshape_data(data):
 
 
 def create_dataframe(path = None):
-    """Local dataloader class for the data in the Cleaned_Data_Directory"""
+    """Local dataloader class for the data in the Cleaned_Data_Directory
+        - function is very specific to the data in the directory and will not work unless 
+        dataformat is the same"""
     features = [i[0] for i in get_feature_order()]
     features.append("mask")
     features = list(band_mapping.keys()) + features
@@ -49,6 +51,20 @@ def create_dataframe(path = None):
     data_expanded = data_combined.reshape(-1, len(features))
     df = pd.DataFrame(data_expanded, columns = features).dropna()
     return df
+
+def create_row_data_frame(path = None, fname = "imgs.npy"):
+    """Local data loader class that generates each image as a row from a numpy array
+        without the additional features"""
+    if path is not None:
+        images = np.load(os.path.join(path, fname))
+        images_shape = images.shape
+        
+    data_expanded = images.reshape(images.shape[0], -1)
+    df = pd.DataFrame(data_expanded)
+    return df, images_shape
+
+
+
 
 class TrainPreprocess():
     # Just basic class for preprocessing data
@@ -89,8 +105,8 @@ class TrainPreprocess():
         import joblib
         # Save pipeline
         print("saving pipeline")
-        joblib.dump(pipeline, '/home/ziad/Documents/Github/ShallowLearn/Models/preproc_pipeline.pkl')
-
+        joblib.dump(pipeline, '/home/ziad/Documents/Github/ShallowLearn/Models/preproc_pipeline_normalized.pkl')
+        
 
 
 class TrainOnFullReefs():
@@ -155,6 +171,7 @@ class TrainOnFullReefs():
             # Define the pipeline steps
             scaler = StandardScaler()
             imputer = SimpleImputer(strategy='mean')
+            
 if __name__ == "__main__":
     # TrainOnFullReefs()
     # TrainOnFullReefs.TrainOnLABSpace()
