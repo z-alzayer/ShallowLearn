@@ -178,16 +178,18 @@ thereby necessitating expert verification. This methodology has been applied to 
 Nevertheless, such a process requires labeled data, which can be challenging to procure and process. Moreover, it can be outright impossible in cases dealing with historical satellite imagery, where the ground truth may not always be accessible in an environment that is living and adapting.
 
 
-Unsupervised learning is a type of machine learning that uses unlabelled data to train a model to find patterns in the data itself, helping unlock bottlenecks that exist within labelled data \cite{usama2019unsupervised}.
+Unsupervised learning uses unlabelled data to train a model to find patterns in the data itself, helping unlock bottlenecks that exist within labelled data \cite{usama2019unsupervised}.
 
-In this study we aim to use a combination of unsupervised and supervised learning to classify coral reefs into different classes. Using a combination of more traditional clustering methods and various colour spaces. We then use a supervised learning algorithms to provide additional insight into the clustering and 
+In this study we aim to use a combination of unsupervised and supervised learning to classify coral reefs into different classes. Using a combination of more traditional clustering methods and various color spaces. 
+We then use a supervised learning algorithms to provide additional insight into the clustering and 
 retrieve understandable results from the data and its clusters, including using simple logistic regression to gain insight into the data itself.
 
 \citep{Hedley2016} provide a comprehensive overview of sensor limitations and uses for coral reef monitoring, including the use of satellite imagery. Many challenges exist in the processing of the data, one such problem is 
 sea roughness due to wind is also a problem as very large changes in reflectance such as sun glint also affect the imagery negatively  and should generally be discarded and or masked out \cite{gordon1997atmospheric}
 
 Object based segmentation methods have had good success at discriminating classes of various corals \cite{Nguyen2021}, with studies combining both pixel based methods and object based methods 
-also showing a high degree of accuracy in water bodies \cite{huang2015combining}
+also showing a high degree of accuracy in water bodies \cite{huang2015combining}.
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -215,9 +217,19 @@ In this study we setup a series of systematic experiments using the workflow des
 \end{itemize}
 
 \subsection*{Data collection, preprocessing and Stacking}
-Image correction for L1C data was done using the sen2cor processor for all the imagery to remove atmospheric effects. This was followed by cloud masking using the Fmask algorithm \cite{Zhe2012}. The Fmask algorithm uses the blue, red, near-infrared and shortwave infrared bands to create a cloud mask. 
-The cloud mask is then used to remove the clouds from the image. The Fmask algorithm was chosen as it is a widely used and tested algorithm for cloud masking Sentinel-2 imagery and it also provides a mask for water, a ratio of water to clouds was used to filter out the imagery which resulted 
-in a relatively cloud free dataset for the study area (Lizard Island Australia) with a total of 56 images that were cloud free, one cloudy image was also included in the dataset in order to cover a wider variety of data in the training set.
+Early sentinel-2 imagery is provided only on level 1 data, this data is not corrected for surface reflectance and needs to be corrected using an atmospheric processor. Sen2cor was 
+used as it is used by default for L2A data distributed by the ESA, meaning that the L1C data would be procssed the exact same way. 
+
+This was followed by cloud masking using the Fmask algorithm \cite{Zhe2012}. The Fmask algorithm uses the blue, red, near-infrared and shortwave infrared bands to create a cloud mask. 
+The cloud mask is then used to remove cloudy imagery from the dataset using a threshold of around 15
+\% over a given reef area, meaning that, even if a given scene is very cloudy, we still check whether the individual reef contains viable information. 
+The Fmask algorithm was chosen as it is a widely used and tested algorithm for cloud masking Sentinel-2 imagery and it also provides a mask for water, a ratio of water to clouds was used to filter out the imagery which resulted 
+in a relatively cloud free dataset for the study area (Lizard Island Australia) with a total of 56 images that were cloud free, one cloudy scene was also included in the dataset in order to cover a wider variety of data in the training set.
+
+We then transform individual reef areas to per image vectors, converting each image of the time series into a row vector, this is done to explore the dataset and understand the distribution of 
+atmospheric effects and other noise in the dataset. This is done for seperately for each reef area and the results are clustered, allowing for seperate preprocessing
+on each seperate cluster. 
+
 
 \begin{figure}
 	\centering
@@ -226,15 +238,23 @@ in a relatively cloud free dataset for the study area (Lizard Island Australia) 
 	\label{fig:PreprocWorkflow}
 \end{figure}
 
-\subsection*{colour correction and colour spaces}
-As bands 4,3,2 (centered at 664, 559 and 492 nm) roughly represent the RGB colour space, we use this as a starting point for our colour correction. We then use the following colour spaces to create additional features for the data, from the colour spaces examined tests were run on the LAB \cite{wyszecki2000color}, HSV and HSI \cite{gonzalezr2006digital} 
-colour spaces respectively. This was done to preserve the overall colour scheme and ensure the images are stretched correctly.  
+\subsection*{color correction and color spaces}
+Several methods for color correction and spaces were tested, including the use of the RGB color space, the LAB color space and the HSV color space. 
+The RGB color space was chosen as the bands 4,3,2 (centered at 664, 559 and 492 nm) roughly represent the RGB color space and are most likely to penetrate the water.
 
+We use the RGB color space as a starting point for our color correction. We then use the following color spaces to create additional features for the data, from the color spaces examined tests were run on the LAB \cite{wyszecki2000color}, HSV and HSI \cite{gonzalezr2006digital} 
+color spaces respectively. This was done to preserve the overall color scheme and ensure the images are stretched correctly.  
+\begin{figure}
+	\centering
+	\includegraphics[width=0.7\linewidth]{Images/Sentinel-2 Wavelengths.png}
+	\caption{Figure showing the wavelengths and centers of the sentinel-2A and 2B satellites}
+	\label{fig:wavelengths_sen2}
+\end{figure}
 The images were then stacked into time series for the lizard island location, and feature generation for each individual time slice was done using the following indices:
  \begin{itemize}
 	\item Chlorophyll Index (CI): Used to estimate chlorophyll content in vegetation. This information can give insights into the health and vigor of plants.
 	
-	\item Ocean colour Index (OCI): Used to assess ocean colour properties, particularly the presence of chlorophyll. This index can help in studying phytoplankton abundance and water quality in marine environments.
+	\item Ocean color Index (OCI): Used to assess ocean color properties, particularly the presence of chlorophyll. This index can help in studying phytoplankton abundance and water quality in marine environments.
 	
 	\item Suspended Sediment Index (SSI): Used to estimate the concentration of suspended sediments in water bodies. This index is helpful in monitoring water quality, sediment transport, and erosion processes.
 	
@@ -249,6 +269,8 @@ The images were then stacked into time series for the lizard island location, an
 	\item In addition to these indices, the code contains a function for masking out land areas in an image (\texttt{mask\_land}) using the NIR band and threshold, generally named the black pixel approximation \cite{siegel2000atmospheric}.
 \end{itemize}
 Resulting in a total of approximately ~1 million unique data points covering the range of the time series containing the original 13 bands and 7 additional features.
+
+
 
 \subsection*{Unsupervised learning}
 These are then entered into 3 dimensionality reduction algorithms, PCA \cite{pearson1901}, t-SNE \cite{van2008visualizing} and UMAP \cite{mcinnes2018umap}. These dimensionality reduction algorithms are then used to reduce the dimensionality of the data to 2 dimensions. These are then used to cluster the data using a combination of K-means, DBSCAN and HDBSCAN. The clusters retrieved from these algorithms 
@@ -269,8 +291,15 @@ additional scope for creating probability maps and testing the accuracy of the c
 We find that 10 clusters is the optimal number of clusters for the Lizard Island dataset, this is based on the silhouette score and the visual inspection of the clusters. This is based on several visualisations of the clusters, including the t-SNE and UMAP visualisations. 
 The clusters are also tested using a combination of K-means, DBSCAN and HDBSCAN. The results of the clustering are shown in Figure \ref{fig:ClusteringResults - placeholder}. These clusters align fairly well with published work from \citep{Kennedy2021}. 
 
-\subsection*{Alternative colour spaces}
-By manipulating the data into various colour spaces, we are able to effectively overcome some of the issues related with the original data being improperly stretched, allowing the original clustering workflow to work more effectively on various time slices that may not be radiometrically
+We also find that optimizing the algorithm per individual time-step also provides more consistent results for extracting the relavent reef information, using the previous clusters
+centers we are able to get repeatable clusters for all of the time series, which allows for a rough approximation of what is occuring throughout the time series.
+
+We generally find that the imagery is not always easily comparable through time, even using ratioing techniques we do not find clear repeatable clusters
+
+
+
+\subsection*{Alternative color spaces}
+By manipulating the data into various color spaces, we are able to effectively overcome some of the issues related with the original data being improperly stretched, allowing the original clustering workflow to work more effectively on various time slices that may not be radiometrically
 normalised correctly, whilst this process does not adhere properly to conventional remote sensing workflows, we show that the output imagery is generally improved upon qualitative visual inspection. 
 
 \section{Discussion}
