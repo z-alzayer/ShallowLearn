@@ -177,6 +177,10 @@ This has been applied at a variety of scales from classification of individual c
 thereby necessitating expert verification. This methodology has been applied to categorize images of coral reefs into various classes such as coral, sand, algae, and rubble \cite{Li2020}. 
 Nevertheless, such a process requires labeled data, which can be challenging to procure and process. Moreover, it can be outright impossible in cases dealing with historical satellite imagery, where the ground truth may not always be accessible in an environment that is living and adapting.
 
+Atmospheric corrections are also necessary for optical imaging 
+
+
+()\cite{louis2016sentinel} reflectance uncertainty up to 0.06 for NDVI), using the sen2cor atmospheric processor, it uses a combination of DDV (Dark Dense Vegetation) pixels to apply an atmospheric correction based on the \cite{atmospheric_correction1988}
 
 Unsupervised learning uses unlabelled data to train a model to find patterns in the data itself, helping unlock bottlenecks that exist within labelled data \cite{usama2019unsupervised}.
 
@@ -189,6 +193,12 @@ sea roughness due to wind is also a problem as very large changes in reflectance
 
 Object based segmentation methods have had good success at discriminating classes of various corals \cite{Nguyen2021}, with studies combining both pixel based methods and object based methods 
 also showing a high degree of accuracy in water bodies \cite{huang2015combining}.
+
+
+\cite{zekoll2021comparison} Provide a comprehensive comparison of three masking algorithms, fmask, Sen2Cor and ATCOR, with f-mask producing the highest class accuracy for water bodies and Sen2Cor 
+highest overall accuracy for water scenes. F-mask also produces the highest overall accuracy for cloudy scenes. This is relevant to the discussion as these have been used as intermediate steps in the processing of the data.
+and understanding overall sources of error and uncertainty in the data is important for understanding the results of the clustering and classification. Comparisons of the algorithms versus supervised machine learning approaches have been
+done by \cite{raiyani2021sentinel}, with results indicating that machine learning approaches outperforming the Sen2Cor scene classification.
 
 
 
@@ -294,13 +304,16 @@ The clusters are also tested using a combination of K-means, DBSCAN and HDBSCAN.
 We also find that optimizing the algorithm per individual time-step also provides more consistent results for extracting the relavent reef information, using the previous clusters
 centers we are able to get repeatable clusters for all of the time series, which allows for a rough approximation of what is occuring throughout the time series.
 
-We generally find that the imagery is not always easily comparable through time, even using ratioing techniques we do not find clear repeatable clusters
+We generally find that the imagery is not always easily comparable through time, even using ratioing techniques we do not find clear repeatable clusters. This is likely due to the fact that the imagery is not always radiometrically normalised correctly, to combat this, 
+performing a histogram normalisation on the data before clustering, along the entire time series itself with with reference to an initial source image, we find that the clusters become much more consistent
+through time.  
 
 
 
 \subsection*{Alternative color spaces}
 By manipulating the data into various color spaces, we are able to effectively overcome some of the issues related with the original data being improperly stretched, allowing the original clustering workflow to work more effectively on various time slices that may not be radiometrically
-normalised correctly, whilst this process does not adhere properly to conventional remote sensing workflows, we show that the output imagery is generally improved upon qualitative visual inspection. 
+normalised correctly, whilst this process does not adhere properly to conventional remote sensing workflows, we show that the output imagery is generally improved upon qualitative visual inspection but as the values
+themselves are shifted this approach proves to actually degrade the performance of the algorithm. 
 
 \section{Discussion}
 Authors should discuss the results and how they can be interpreted from the perspective of previous studies and of the working hypotheses. The findings and their implications should be discussed in the broadest context possible. Future research directions may also be highlighted.
