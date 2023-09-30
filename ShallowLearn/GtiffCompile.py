@@ -4,7 +4,9 @@ from rasterio import open as rio_open
 import numpy as np
 
 from ShallowLearn.LoadData import LoadGeoTIFF
-from ShallowLearn.FileProcessing import unzip_files, get_file_names_from_zip, delete_files_from_dir, list_files_in_dir, filter_files_by_extension, check_values_in_filenames, order_by_band
+from ShallowLearn.FileProcessing import (unzip_files, get_file_names_from_zip, delete_files_from_dir, 
+                                         list_files_in_dir, filter_files_by_extension, check_values_in_filenames,
+                                        order_by_band, list_files_in_dir_recur, order_by_band_wo_regex)
 from ShallowLearn.band_mapping import band_mapping
 
 files_to_keep = []
@@ -74,7 +76,7 @@ class ImageCompiler():
 
 class GeotiffGenerator():
     """
-    Class for generating GeoTIFF files from Sentinel-2 zip files.
+    Class for generating GeoTIFF files from Sentinel-2 zip or extracted zip files.
 
     Attributes
     ----------
@@ -94,7 +96,42 @@ class GeotiffGenerator():
         self.output_path = output_path
         self.band_order = band_order
         self.output_name = output_name
-        self.process_zip()
+        # self.process_zip()
+
+    def process_extracted_zip(self, high_res_band = "B02"):
+        """
+        Process the extracted zip file and generate a GeoTIFF.
+
+        Parameters
+        ----------
+        high_res_band : str
+            The band with the highest resolution to use when processing.
+            Defaults to "B02".
+        """
+        # Filter out the image files from the zip
+        image_files = list_files_in_dir_recur(self.zip_path)
+        image_files = check_values_in_filenames(image_files, self.band_order)
+        
+        # This is super sentinel specific - needs to be changed for landsat or atleast made more general
+        self.ordered_image_files = [file for file in image_files if "IMG_DATA" in file]
+        print(self.ordered_image_files)
+
+        ##### fix the stuff here
+        # print(order_by_band_wo_regex(self.ordered_image_files))
+        # Append the outpath to the extracted image files
+        self.ordered_image_files = [self.zip_path + i for i in self.ordered_image_files]
+        # print(self.ordered_image_files)
+        high_res_index = band_mapping[high_res_band]['index']
+        self.stack = ImageCompiler(self.ordered_image_files, self.ordered_image_files[2], self.output_path + self.output_name)
+        self.stack.create_stack(self.output_path + self.output_name)
+        self.stack.compile()
+        # print(self.output_path)
+        # print(self.output_path + self.output_name)
+        if "/" in self.output_name:
+            self.output_name = self.output_name.split("/")[-1]
+            files_to_keep.append(self.output_name)
+        print(files_to_keep)
+        delete_files_from_dir(self.output_path, files_to_keep)
 
     def process_zip(self, high_res_band = "B02"):
         """
@@ -128,3 +165,6 @@ class GeotiffGenerator():
         print(files_to_keep)
         delete_files_from_dir(self.output_path, files_to_keep)
 
+if __name__ == "__main__":
+    img_gen = GeotiffGenerator("/home/zba21/Documents/Imagery/L1C_Converted/S2A_MSIL1C_20191123T003711_N0208_R059_T55LCD_20191123T020732.SAFE","/home/zba21/Documents/CompiledImagery/","Test.tiff")
+    img_gen.process_extracted_zip()
