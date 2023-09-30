@@ -49,6 +49,23 @@ def delete_files_from_dir(directory, files_to_keep=None):
             dir_path = os.path.join(root, dir_name)
             shutil.rmtree(dir_path)
 
+def list_files_in_dir_recur(directory):
+    """
+    Lists all files in a directory including subdirectories.
+
+    directory: Directory from which files will be listed.
+    """
+    files = []
+
+    # Iterate over items in the directory
+    for root, dirnames, filenames in os.walk(directory):
+        for filename in filenames:
+            files.append(os.path.join(root, filename))
+
+    return files
+
+
+
 def list_files_in_dir(directory):
     """
     Lists all files in a directory.
@@ -140,6 +157,42 @@ def get_highest_resolutions(files):
 
     # Only return the file paths
     return [file for resolution, file in highest_resolutions.values()]
+
+def order_by_band_wo_regex(files, order = band_mapping.keys()):
+    """
+    Function to order image files by band. The default order is provided by the band_mapping keys.
+    
+    Parameters
+    ----------
+    files : list
+        A list of file paths to the image files.
+    order : iterable, optional
+        An iterable specifying the desired order of bands. Defaults to the keys of the band_mapping dictionary.
+
+    Returns
+    -------
+    list
+        A list of file paths ordered by band according to the specified order.
+
+    Notes
+    -----
+    This function specifically looks for files with highest resolution and orders them.
+    Band information is extracted from the filenames assuming a specific pattern: "B[number][optional letter]_[resolution]m".
+    """
+
+    bands_files = files
+    # Create a new OrderedDict
+    ordered_files = OrderedDict()
+    
+    # Populate the OrderedDict
+    for band in order:
+        if band in bands_files:
+            ordered_files[band] = bands_files[band]
+            
+    # Return only the file paths
+    return list(ordered_files.values())
+
+
 
 def order_by_band(files, order = band_mapping.keys()):
     """
