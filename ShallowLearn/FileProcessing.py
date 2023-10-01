@@ -158,40 +158,16 @@ def get_highest_resolutions(files):
     # Only return the file paths
     return [file for resolution, file in highest_resolutions.values()]
 
-def order_by_band_wo_regex(files, order = band_mapping.keys()):
-    """
-    Function to order image files by band. The default order is provided by the band_mapping keys.
-    
-    Parameters
-    ----------
-    files : list
-        A list of file paths to the image files.
-    order : iterable, optional
-        An iterable specifying the desired order of bands. Defaults to the keys of the band_mapping dictionary.
+def order_band_names_noreg(file_names, band_mapping = band_mapping):
+    # Extracts band identifier from file name
+    def get_band_identifier(file_name):
+        for band in band_mapping:
+            if band in file_name:
+                return band
+        return None
 
-    Returns
-    -------
-    list
-        A list of file paths ordered by band according to the specified order.
-
-    Notes
-    -----
-    This function specifically looks for files with highest resolution and orders them.
-    Band information is extracted from the filenames assuming a specific pattern: "B[number][optional letter]_[resolution]m".
-    """
-
-    bands_files = files
-    # Create a new OrderedDict
-    ordered_files = OrderedDict()
-    
-    # Populate the OrderedDict
-    for band in order:
-        if band in bands_files:
-            ordered_files[band] = bands_files[band]
-            
-    # Return only the file paths
-    return list(ordered_files.values())
-
+    # Sort by the index value in band_mapping
+    return sorted(file_names, key=lambda x: band_mapping[get_band_identifier(x)]['index'])
 
 
 def order_by_band(files, order = band_mapping.keys()):
