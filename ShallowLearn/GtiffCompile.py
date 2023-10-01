@@ -2,14 +2,21 @@ from rasterio import crs
 from rasterio.enums import Resampling
 from rasterio import open as rio_open
 import numpy as np
+import logging
+import os
+import tempfile
+import shutil
+
 
 from ShallowLearn.LoadData import LoadGeoTIFF
+import ShallowLearn.Transform as tf
 from ShallowLearn.FileProcessing import (unzip_files, get_file_names_from_zip, delete_files_from_dir, 
                                          list_files_in_dir, filter_files_by_extension, check_values_in_filenames,
-                                        order_by_band, list_files_in_dir_recur, order_by_band_wo_regex)
+                                        order_by_band, list_files_in_dir_recur, order_band_names_noreg)
 from ShallowLearn.band_mapping import band_mapping
 
 files_to_keep = []
+
 
 class ImageCompiler():
     """
@@ -114,28 +121,57 @@ class GeotiffGenerator():
         
         # This is super sentinel specific - needs to be changed for landsat or atleast made more general
         self.ordered_image_files = [file for file in image_files if "IMG_DATA" in file]
-        print(self.ordered_image_files)
+
 
         ##### fix the stuff here
         # print(order_by_band_wo_regex(self.ordered_image_files))
         # Append the outpath to the extracted image files
-        self.ordered_image_files = [self.zip_path + i for i in self.ordered_image_files]
+        self.ordered_image_files = order_band_names_noreg(self.ordered_image_files)
+        # for i in self.ordered_image_files:
+        #     print(i)
         # print(self.ordered_image_files)
         high_res_index = band_mapping[high_res_band]['index']
         self.stack = ImageCompiler(self.ordered_image_files, self.ordered_image_files[2], self.output_path + self.output_name)
         self.stack.create_stack(self.output_path + self.output_name)
         self.stack.compile()
-        # print(self.output_path)
-        # print(self.output_path + self.output_name)
-        if "/" in self.output_name:
-            self.output_name = self.output_name.split("/")[-1]
-            files_to_keep.append(self.output_name)
-        print(files_to_keep)
-        delete_files_from_dir(self.output_path, files_to_keep)
+    
+    def process_sen2cor_local(self, high_res_band = "B02"):
+        """
+        Process the extracted zip file and generate a GeoTIFF.
+
+        Parameters
+        ----------
+        high_res_band : str
+            The band with the highest resolution to use when processing.
+            Defaults to "B02".
+        """
+        # Filter out the image files from the zip
+        image_files = list_files_in_dir_recur(self.zip_path)
+        # print(image_files)
+        image_files = check_values_in_filenames(image_files, self.band_order)
+        # print(image_files)
+        # This is super sentinel specific - needs to be changed for landsat or atleast made more general
+        self.ordered_image_files = [file for file in image_files if "IMG_DATA" in file]
+
+        # print(self.ordered_image_files)
+        ##### fix the stuff here
+        # print(order_by_band_wo_regex(self.ordered_image_files))
+        # Append the outpath to the extracted image files
+        self.ordered_image_files = order_by_band(self.ordered_image_files)
+        # for i in self.ordered_image_files:
+        #     print(i)
+        # print(self.ordered_image_files)
+        high_res_index = band_mapping[high_res_band]['index']
+        self.stack = ImageCompiler(self.ordered_image_files, self.ordered_image_files[2], self.output_path + self.output_name)
+        self.stack.create_stack(self.output_path + self.output_name)
+        self.stack.compile()
+
+
 
     def process_zip(self, high_res_band = "B02"):
         """
         Process the zip file and generate a GeoTIFF.
+        This uses L2A Imagery that is already processed by ESA
 
         Parameters
         ----------
@@ -157,8 +193,8 @@ class GeotiffGenerator():
         self.stack = ImageCompiler(self.ordered_image_files, self.ordered_image_files[2], self.output_name)
         self.stack.create_stack(self.output_name)
         self.stack.compile()
-        print(self.output_path)
-        print(self.output_path + self.output_name)
+        # print(self.output_path)
+        # print(self.output_path + self.output_name)
         if "/" in self.output_name:
             self.output_name = self.output_name.split("/")[-1]
             files_to_keep.append(self.output_name)
@@ -166,5 +202,30 @@ class GeotiffGenerator():
         delete_files_from_dir(self.output_path, files_to_keep)
 
 if __name__ == "__main__":
-    img_gen = GeotiffGenerator("/home/zba21/Documents/Imagery/L1C_Converted/S2A_MSIL1C_20191123T003711_N0208_R059_T55LCD_20191123T020732.SAFE","/home/zba21/Documents/CompiledImagery/","Test.tiff")
-    img_gen.process_extracted_zip()
+    import os
+    import pandas as pd
+
+    print(os.getcwd())
+    
+    path = "/media/ziad/Expansion/Full_Imagery/S2A_Conversion"
+    suitable_imagery = pd.read_csv("Data/Cloud_Mask_40_threshold.csv")
+    
+    img_list = list(suitable_imagery.to_dict()['0'].values())
+    acquisition_date = [name.split("_")[2] for name in img_list]
+    # for name in img_list:
+    #     print(name.split("_")[2])
+  
+    imagery = os.listdir(path)
+    suitable_files = check_values_in_filenames(imagery, acquisition_date)
+    print(len(suitable_files))
+    # for i in imagery:
+    #     if i.endswith(".SAFE"):
+    #         date_number = i.split('_')[2][:8]  # Extract the date number, e.g., 20220307
+            
+    #         # Check if date_number exists in any of the filenames in img_list
+    #         if any(date_number in img_name for img_name in img_list):
+    #             print(i)
+    #             # img_gen = GeotiffGenerator(os.path.join(path, i), 
+    #             #                            "/media/ziad/Expansion/Full_Imagery/CompiledImagery/",
+    #             #                            f"{i}.tiff")
+    #             # img_gen.process_sen2cor_local()
