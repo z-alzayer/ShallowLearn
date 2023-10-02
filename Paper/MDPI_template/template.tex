@@ -177,7 +177,7 @@ This has been applied at a variety of scales from classification of individual c
 thereby necessitating expert verification. This methodology has been applied to categorize images of coral reefs into various classes such as coral, sand, algae, and rubble \cite{Li2020}. 
 Nevertheless, such a process requires labeled data, which can be challenging to procure and process. Moreover, it can be outright impossible in cases dealing with historical satellite imagery, where the ground truth may not always be accessible in an environment that is living and adapting.
 
-Atmospheric corrections are also necessary for optical imaging 
+Atmospheric corrections are also necessary for optical imaging, for the purposes of our testing we use sen2cor v2.11
 
 
 ()\cite{louis2016sentinel} reflectance uncertainty up to 0.06 for NDVI), using the sen2cor atmospheric processor, it uses a combination of DDV (Dark Dense Vegetation) pixels to apply an atmospheric correction based on the \cite{atmospheric_correction1988}
@@ -236,9 +236,16 @@ The cloud mask is then used to remove cloudy imagery from the dataset using a th
 The Fmask algorithm was chosen as it is a widely used and tested algorithm for cloud masking Sentinel-2 imagery and it also provides a mask for water, a ratio of water to clouds was used to filter out the imagery which resulted 
 in a relatively cloud free dataset for the study area (Lizard Island Australia) with a total of 56 images that were cloud free, one cloudy scene was also included in the dataset in order to cover a wider variety of data in the training set.
 
+
 We then transform individual reef areas to per image vectors, converting each image of the time series into a row vector, this is done to explore the dataset and understand the distribution of 
 atmospheric effects and other noise in the dataset. This is done for seperately for each reef area and the results are clustered, allowing for seperate preprocessing
-on each seperate cluster. 
+on each seperate cluster. This resulted in a simple way to cluster the images themselves and understand the effects of the atmospheric correction on each individual image, as well as some insight into
+the visibility of the image itself. 
+
+Once this process was completed, the next step was to correct the imagery and this was done using a variety of classical computer vision methods. Ranging from color transformations to 
+histogram equalisation, as well as a combination of these methods. The results of these methods are shown in Figure ( fig ref is a placeholder)\ref{fig:Scaling} - whereby .
+
+
 
 
 \begin{figure}
@@ -332,9 +339,9 @@ using simple explainable algorithms.
 \section{Conclusions}
 
 The research presented demonstrates an efficient and quick approach to habitat mapping, underlining the importance of the use of high-resolution satellite imagery. The results show that the proposed approach is able to provide a good classification of the habitats, with an overall accuracy of 80\%. The results are comparable to those obtained by other authors using different approaches. The proposed approach is also able to provide a good classification of the habitats, with an overall accuracy of 70 to 80\% using simple regression methods. 
-The results are comparable to those published in other machine learning studies whilst remaining explainable, we also show that a workflow reliant on pixel-based methods remains viable.
+The results are comparable to those published in other machine learning studies whilst remaining explainable, we also show that a workflow reliant on pixel-based methods remains viable for early assesment workflows and monitoring.
 
-Future research could benefit from incorporating specific local spectral indices in order to be more generalisable to other areas. The use of a larger training set and or ground truthed labelled data would also be benificial as this would allow more accurate validation of the results. 
+Future research could benefit from incorporating specific local spectral indices as well as local scale atmospheric models in order to be more generalisable to other areas. The use of a larger training set and or ground truthed labelled data would also be benificial as this would allow more accurate validation of the results. 
 
 Our research shows that a simple approach for pixel classification and clustering is viable for large scale monitoring of coral reefs across a wide range of geographical and ecological contexts, and that the use of sentinel-2 satellite imagery is a viable companion to more expensive methods.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
