@@ -258,8 +258,39 @@ def generate_multichannel_mask(img, mask=None, mask_val=9):
         rescaled_image[:, :, i] = (final_mask[:, :, i] - channel_min) / (channel_max - channel_min) * 255
     return rescaled_image
 
+def plot_histogram(img,  plot=True, bins=50, min_value=1, title=None):
+    """
+    Plots histogram for a specific channel in the input image.
 
-def plot_histograms(img, plot=True, bins=50, min_value=1):
+    Args:
+        img (numpy.ndarray): The input image array.
+        channel (int): The index of the channel to be plotted. Default is 0.
+        plot (bool): Flag to indicate whether to plot the histogram or not. Default is True.
+        bins (int): The number of bins for the histogram. Default is 50.
+        min_value (int): The minimum value to consider for the histogram. Values below this threshold will be removed. Default is 1.
+        title (str): Title of the plot. Default is None.
+
+    Returns:
+        None
+    """
+
+    
+    if plot:
+        channel_data = img.flatten()
+        channel_data = channel_data[channel_data >= min_value]
+        
+        # Plotting the histogram
+        plt.hist(channel_data, bins=bins, range=(0, np.max(channel_data)))
+        
+        # Customize the plot
+        plt.xlabel('Value')
+        plt.ylabel('Frequency')
+        plt.title(title if title else f'Histogram')
+        plt.show()
+
+
+
+def plot_histograms(img, plot=True, bins=50, min_value=1, channel_legend=None, title = None):
     """
     Plots histograms for each channel in the input image using line plots.
 
@@ -268,11 +299,16 @@ def plot_histograms(img, plot=True, bins=50, min_value=1):
         plot (bool): Flag to indicate whether to plot the histograms or not. Default is True.
         bins (int): The number of bins for the histograms. Default is 50.
         min_value (int): The minimum value to consider for the histograms. Values below this threshold will be removed. Default is 1.
+        channel_legend (dict): Dictionary for channel legend. Keys are channel indices and values are channel names. Default is None.
 
     Returns:
         None
 
     """
+    if len(img.shape) == 2:
+        plot_histogram(img, plot=plot, bins=bins, min_value=min_value, title=title)
+        return
+
     num_channels = img.shape[2]
 
     if plot:
@@ -282,13 +318,19 @@ def plot_histograms(img, plot=True, bins=50, min_value=1):
             channel_data = channel_data[channel_data >= min_value]
             histogram, _ = np.histogram(channel_data, bins=bins, range=(0, np.max(img)))
 
+            # Use the dictionary for legend if provided, else use default labeling
+            label = channel_legend[i] if channel_legend and i in channel_legend else f'Channel {i + 1}'
+
             # Plot the histogram using line plot
-            plt.plot(x, histogram, label=f'Channel {i + 1}')
+            plt.plot(x, histogram, label=label)
 
         # Customize the plot
         plt.xlabel('Value')
         plt.ylabel('Frequency')
-        plt.title('Histogram of Each Channel')
+        if title is None:
+            plt.title('Histogram of Each Channel')
+        else:
+            plt.title(title)
         plt.legend()
         plt.show()
 
@@ -342,7 +384,7 @@ def discrete_implot(arr, change_labels=None, change_colors=None, pixel_scale=10,
     plt.show()
 label_dict = {}  # Global dictionary to ensure label consistency between plots
 
-def discrete_implotv2(arr, ax=None, change_labels=None, change_colors=None, pixel_scale=10, title=None, return_fig=False):
+def discrete_implotv2(arr, ax=None, string_labels=None, change_colors=None, pixel_scale=10, title=None, return_fig=False):
     global label_dict
 
     if len(arr.shape) == 1:
@@ -362,11 +404,11 @@ def discrete_implotv2(arr, ax=None, change_labels=None, change_colors=None, pixe
     # Create color list using the 'viridis' colormap
     colors = plt.get_cmap('viridis')(np.linspace(0, 1, num_labels))
     
-    # If change_labels and change_colors are specified, modify the corresponding colors
-    if change_labels is not None and change_colors is not None:
-        for label, color in zip(change_labels, change_colors):
+    # If change_colors are specified, modify the corresponding colors
+    if change_colors is not None:
+        for label, color in zip(label_to_int.keys(), change_colors):
             if label in label_to_int:
-                colors[label_to_int[label]] = to_rgba(color)
+                colors[label_to_int[label]] = color
             else:
                 print(f"Label {label} not found in array.")
 
@@ -384,23 +426,15 @@ def discrete_implotv2(arr, ax=None, change_labels=None, change_colors=None, pixe
     # Create a colorbar with discrete levels
     cbar = fig.colorbar(im, ax=ax, ticks=np.arange(num_labels), drawedges=True)
     cbar.set_label('Labels')
-    cbar.set_ticklabels(list(label_to_int.keys()))  # Set the tick labels using label_dict
-
-    # Add scale bar of 1 km
-    scalebar = AnchoredSizeBar(ax.transData,
-                               10 * pixel_scale, '1 km', 'lower right', 
-                               pad=0.25,
-                               color='white',
-                               frameon=False,
-                               size_vertical=1)
-    ax.add_artist(scalebar)
-
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    if title is not None:
-        ax.set_title(title)
+    
+    # Set the tick labels using string_labels if provided, else use label_to_int keys
+    if string_labels:
+        cbar.set_ticklabels([string_labels.get(label, label) for label in label_to_int.keys()])
     else:
-        ax.set_title('Discrete Plot')
+        cbar.set_ticklabels(list(label_to_int.keys()))
+    
+    # Other plot settings here...
+
     if return_fig:
         return fig
     if show_plot:

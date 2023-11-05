@@ -14,8 +14,8 @@ from sklearn.pipeline import Pipeline
 import umap
 from sklearn.model_selection import ParameterGrid
 
-PATH = "/media/ziad/Expansion/Cleaned_Data_Directory/"
-graph_path = "/home/ziad/Documents/Github/ShallowLearn/Graphs"
+PATH = "/media/zba21/Expansion/Cleaned_Data_Directory/"
+graph_path = "/home/zba21/Documents/Github/ShallowLearn/Graphs"
 SAMPLE_SIZE = 200_000
 
 param_grid = {
@@ -25,28 +25,26 @@ param_grid = {
 }
 
 
-def create_scatter_cmap(df, cols = None, alpha = None):
-    """converts colour space to a format compatible with matplotlib scatter
-        of values between -1 and 1 then linearly converts it back to 0 and 1
-          - using B08 as alpha, input columns are
-        a list"""
-    # make a copy of the dataframe and so that changes are not inplace
+def create_scatter_cmap(df, cols=None, alpha=None):
     df_copy = df.copy()
 
     if cols is not None and len(cols) > 4:
         raise ValueError("Too many columns, only 4 allowed")
 
     if cols is None:
-        # We assume the alpha is the last channel
         cols = ["B04", "B03", "B02", "B08"]
 
     for column in cols:
         df_copy[column] = np.clip(df_copy[column], -1, 1)
+        print(f"After clipping, {column}: \n{df_copy[column]}")  # Debugging line
+
     for column in cols:
         df_copy[column] = (df_copy[column] + 1) / 2
+        print(f"After normalizing, {column}: \n{df_copy[column]}")  # Debugging line
 
     if alpha is not None and len(cols) == 4:
         df_copy[cols[-1]] = df_copy[cols[-1]] * alpha
+        print(f"After alpha adjustment, {cols[-1]}: \n{df_copy[cols[-1]]}")  # Debugging line
 
     df_copy['colour'] = list(zip(*[df_copy[col] for col in cols]))
     return df_copy['colour']
@@ -148,7 +146,7 @@ if __name__ == "__main__":
     df = df.loc[df['mask'] == 1]
     print("dropped mask values")
     df = df.drop(columns = ['mask'])
-    pipe = joblib.load("/home/ziad/Documents/Github/ShallowLearn/Models/preproc_pipeline.pkl")
+    pipe = joblib.load("/home/zba21/Documents/Github/ShallowLearn/Models/preproc_pipeline.pkl")
     sample = df.sample(SAMPLE_SIZE, random_state = 42)
     df = pd.DataFrame(pipe.transform(sample), columns = pipe.feature_names_in_)
     for params in ParameterGrid(param_grid):

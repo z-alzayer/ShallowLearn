@@ -6,6 +6,41 @@ from collections import OrderedDict
 import shutil
 from ShallowLearn.band_mapping import band_mapping
 
+
+
+def filter_files(file_paths, min_size_mb=1, max_size_mb=10):
+    """
+    Filters out files smaller than min_size_mb or larger than max_size_mb.
+    
+    :param file_paths: List of file paths to check.
+    :param min_size_mb: Minimum allowed file size in MB.
+    :param max_size_mb: Maximum allowed file size in MB.
+    :return: List of file paths that satisfy the size conditions.
+    """
+    filtered_files = []
+    
+    for file_path in file_paths:
+        # Get file size in bytes
+        file_size_bytes = os.path.getsize(file_path)
+        
+        # Convert file size to MB
+        file_size_mb = file_size_bytes / (1024 * 1024)
+        
+        # Print file sizes
+        # print(f"File: {file_path}, Size: {file_size_mb:.2f} MB")
+        
+        # Keep the file if it satisfies the size conditions
+        if min_size_mb <= file_size_mb <= max_size_mb:
+            filtered_files.append(file_path)
+            
+    return filtered_files
+
+
+
+def get_files_with_extension(directory_path, extension):
+    return [file for file in os.listdir(directory_path) if file.endswith(extension)]
+
+
 def unzip_files(zip_file_path, file_names, extract_dir):
     """
     Unzips specific files from a zip file.

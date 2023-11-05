@@ -120,7 +120,7 @@ class GeotiffGenerator():
         image_files = check_values_in_filenames(image_files, self.band_order)
         
         # This is super sentinel specific - needs to be changed for landsat or atleast made more general
-        self.ordered_image_files = [file for file in image_files if "IMG_DATA" in file]
+        self.ordered_image_files = [file for file in image_files if "IMG_DATA" in file and file.endswith(".jp2")]
 
 
         ##### fix the stuff here
@@ -204,10 +204,10 @@ class GeotiffGenerator():
 if __name__ == "__main__":
     import os
     import pandas as pd
-
+    out_dir = "/home/zba21/Documents/CompiledImagery/L2A/"
     print(os.getcwd())
     
-    path = "/media/ziad/Expansion/Full_Imagery/S2A_Conversion"
+    path = "/home/zba21/Documents/Imagery/Reprocessed/"
     suitable_imagery = pd.read_csv("Data/Cloud_Mask_40_threshold.csv")
     
     img_list = list(suitable_imagery.to_dict()['0'].values())
@@ -218,14 +218,15 @@ if __name__ == "__main__":
     imagery = os.listdir(path)
     suitable_files = check_values_in_filenames(imagery, acquisition_date)
     print(len(suitable_files))
-    # for i in imagery:
-    #     if i.endswith(".SAFE"):
-    #         date_number = i.split('_')[2][:8]  # Extract the date number, e.g., 20220307
+    for i in imagery:
+        if i.endswith(".SAFE"):
+            date_number = i.split('_')[2][:8]  # Extract the date number, e.g., 20220307
             
-    #         # Check if date_number exists in any of the filenames in img_list
-    #         if any(date_number in img_name for img_name in img_list):
-    #             print(i)
-    #             # img_gen = GeotiffGenerator(os.path.join(path, i), 
-    #             #                            "/media/ziad/Expansion/Full_Imagery/CompiledImagery/",
-    #             #                            f"{i}.tiff")
-    #             # img_gen.process_sen2cor_local()
+            # Check if date_number exists in any of the filenames in img_list
+            if any(date_number in img_name for img_name in img_list):
+                print(i)
+                img_gen = GeotiffGenerator(os.path.join(path, i), 
+                                           out_dir,
+                                           f"{i}.tiff")
+                img_gen.process_sen2cor_local()
+

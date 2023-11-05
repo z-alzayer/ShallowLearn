@@ -17,6 +17,40 @@ def histogram_matching(source_img, reference_img):
         matched_img[..., band] = exposure.match_histograms(source_img[..., band], reference_img[..., band])
     return matched_img
 
+def histogram_matching_with_plot(source_img, reference_img):
+    """
+    Match the histogram of the source_img to the histogram of the reference_img.
+    Returns the matched image.
+    """
+    matched_img = np.empty_like(source_img)
+    num_bands = source_img.shape[-1]
+
+    for band in range(num_bands):
+        matched_img[..., band] = exposure.match_histograms(source_img[..., band], reference_img[..., band])
+
+        # Plot the histograms
+        plt.figure(figsize=(12, 4))
+
+        plt.subplot(1, 3, 1)
+        plt.hist(source_img[..., band].ravel(), bins=256, color='blue', alpha=0.7, label='Source Histogram')
+        plt.hist(reference_img[..., band].ravel(), bins=256, color='green', alpha=0.7, label='Reference Histogram')
+        plt.title('Original Histograms - Band {}'.format(band))
+        plt.legend()
+
+        plt.subplot(1, 3, 2)
+        plt.hist(matched_img[..., band].ravel(), bins=256, color='red', alpha=0.7, label='Matched Histogram')
+        plt.title('Matched Histogram - Band {}'.format(band))
+        plt.legend()
+
+        plt.subplot(1, 3, 3)
+        plt.imshow(matched_img[..., band], cmap='gray')
+        plt.title('Matched Image - Band {}'.format(band))
+
+        plt.tight_layout()
+        plt.show()
+
+    return matched_img
+
 
 def remove_zeros_from_pair(source_band, reference_band):
     """
@@ -150,7 +184,7 @@ def pca_based_normalization(source_img, reference_img):
 
     # Create an empty array for the normalized source image with the same shape as the source_img
     normalized_img = np.empty_like(source_img)
-    source_img = histogram_matching(source_img, reference_img)
+    # source_img = histogram_matching(source_img, reference_img)
     # Assuming X number of bands, all bands are processed
     for band in range(source_img.shape[-1]):
         src_band = source_img[..., band]
@@ -179,6 +213,145 @@ def pca_based_normalization(source_img, reference_img):
         normalized_img[..., band] = normalized_data.reshape(src_band.shape)
 
     return normalized_img
+
+
+def pca_based_normalization_with_plot(source_img, reference_img):
+    assert source_img.shape == reference_img.shape, "The source and reference images must have the same shape."
+
+    normalized_img = np.empty_like(source_img)
+    fig_index = 1
+    num_bands = source_img.shape[-1]
+
+    for band in range(num_bands):
+        src_band = source_img[..., band]
+        ref_band = reference_img[..., band]
+
+        # Original source and reference plots
+        plt.figure(fig_index)
+        plt.subplot(1, 2, 1)
+        plt.imshow(src_band, cmap='gray')
+        plt.title('Original Source - Band {}'.format(band))
+
+        plt.subplot(1, 2, 2)
+        plt.imshow(ref_band, cmap='gray')
+        plt.title('Reference - Band {}'.format(band))
+        fig_index += 1
+
+        src_band_non_zero, ref_band_non_zero = remove_zeros_from_pair(src_band.ravel(), ref_band.ravel())
+        joint_data = np.vstack((src_band_non_zero, ref_band_non_zero)).T
+
+        # Plot joint dataset in original space
+        plt.figure(fig_index)
+        plt.scatter(joint_data[:, 0], joint_data[:, 1], s=1)
+        plt.title('Joint Data - Band {}'.format(band))
+        plt.xlabel('Source Image Band')
+        plt.ylabel('Reference Image Band')
+        fig_index += 1
+
+        pca = PCA(n_components=1, svd_solver='full')
+        pca.fit(joint_data)
+        pc1 = pca.transform(joint_data)
+
+        # Plot PC1 vs reference
+        plt.figure(fig_index)
+        plt.scatter(pc1[:, 0], joint_data[:, 1], s=1)
+        plt.title('PC1 vs Reference Image - Band {}'.format(band))
+        plt.xlabel('PC1')
+        plt.ylabel('Reference Image Band')
+        fig_index += 1
+
+        slope, intercept, _, _, _ = linregress(pc1[:, 0], joint_data[:, 1])
+        print("Band: {}, Slope: {}, Intercept: {}".format(band, slope, intercept))
+        normalized_data = linear_contrast_enhancement(src_band.ravel() * slope + intercept).astype(source_img.dtype)
+        normalized_img[..., band] = normalized_data.reshape(src_band.shape)
+
+        # Plot normalized image
+        plt.figure(fig_index)
+        plt.imshow(normalized_img[..., band], cmap='gray')
+        plt.title('Normalized Source - Band {}'.format(band))
+        fig_index += 1
+
+    plt.show()
+
+    return normalized_img
+
+
+
+def pca_filter_and_normalize_with_plot(source_img, reference_img, threshold=1.0):
+    
+    assert source_img.shape == reference_img.shape, "The source and reference images must have the same shape."
+    normalized_img = np.empty_like(source_img)
+
+    fig_index = 1
+    num_bands = source_img.shape[-1]
+
+    # Original plots
+    for band in range(num_bands):
+        plt.figure(fig_index)
+        plt.subplot(1, 2, 1)
+        plt.imshow(source_img[..., band], cmap='gray')
+        plt.title('Original Source Image - Band {}'.format(band))
+        
+        plt.subplot(1, 2, 2)
+        plt.imshow(reference_img[..., band], cmap='gray')
+        plt.title('Reference Image - Band {}'.format(band))
+        fig_index += 1
+
+    for band in range(num_bands):
+        src_band = source_img[..., band].ravel()
+        ref_band = reference_img[..., band].ravel()
+
+        joint_data = np.vstack((src_band, ref_band)).T
+        pca = PCA(n_components=2)
+        pca.fit(joint_data)
+        transformed_data = pca.transform(joint_data)
+        major_values = transformed_data[:, 1]
+        valid_indices = np.logical_and(major_values >= (-threshold), major_values <= threshold)
+
+        slope, intercept, _, _, _ = linregress(src_band[valid_indices], ref_band[valid_indices])
+        normalized_band = linear_contrast_enhancement(src_band * slope + intercept).astype(source_img.dtype).reshape(source_img[..., band].shape)
+        print("Band: {}, Slope: {}, Intercept: {}".format(band, slope, intercept))
+        normalized_img[..., band] = normalized_band
+
+        plt.figure(fig_index)
+        plt.scatter(src_band, ref_band, s=1, c='blue', label='All Pixels')
+        plt.scatter(src_band[valid_indices], ref_band[valid_indices], s=1, c='red', label='Valid Pixels')
+        plt.title('Joint Data with Valid Pixels Highlighted - Band {}'.format(band))
+        plt.xlabel('Source Image')
+        plt.ylabel('Reference Image')
+        plt.legend()
+        fig_index += 1
+
+        plt.figure(fig_index)
+        plt.scatter(transformed_data[:, 0], transformed_data[:, 1], s=1, c='gray', label='All Pixels')
+        plt.scatter(transformed_data[valid_indices, 0], transformed_data[valid_indices, 1], s=1, c='yellow', label='Valid Pixels')
+        plt.axhline(y=threshold, color='g', linestyle='-')
+        plt.axhline(y=-threshold, color='g', linestyle='-')
+        plt.title('PCA Space with Valid Pixels Highlighted - Band {}'.format(band))
+        plt.xlabel('First Principal Component')
+        plt.ylabel('Second Principal Component')
+        plt.legend()
+        fig_index += 1
+
+        plt.figure(fig_index)
+        plt.scatter(src_band[valid_indices], ref_band[valid_indices], s=1, c='cyan')
+        x_vals = np.array(plt.gca().get_xlim())
+        y_vals = intercept + slope * x_vals
+        plt.plot(x_vals, y_vals, '--', color='black')
+        plt.title('Linear Regression on Valid Pixels - Band {}'.format(band))
+        plt.xlabel('Filtered Source Image')
+        plt.ylabel('Reference Image')
+        fig_index += 1
+
+        plt.figure(fig_index)
+        plt.imshow(normalized_img[..., band], cmap='gray')
+        plt.title('Normalized Image - Band {}'.format(band))
+        fig_index += 1
+
+    plt.show()
+    return normalized_img
+
+
 # Example usage:
 # source_image_np and reference_image_np are numpy arrays of the source and reference images
 

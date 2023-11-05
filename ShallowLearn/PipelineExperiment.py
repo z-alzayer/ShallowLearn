@@ -15,9 +15,9 @@ features = [i[0] for i in get_feature_order()]
 features.append("mask")
 features = list(band_mapping.keys()) + features
 
-indices = np.load("/media/ziad/Expansion/Cleaned_Data_Directory/indices.npy")
-masks = np.load("/media/ziad/Expansion/Cleaned_Data_Directory/masks.npy")
-images = np.load("/media/ziad/Expansion/Cleaned_Data_Directory/imgs.npy")
+indices = np.load("/media/zba21/Expansion/Cleaned_Data_Directory/indices.npy")
+masks = np.load("/media/zba21/Expansion/Cleaned_Data_Directory/masks.npy")
+images = np.load("/media/zba21/Expansion/Cleaned_Data_Directory/imgs.npy")
 masks = np.uint8(masks)
 
 data_combined = np.concatenate((images, indices, masks),axis = 3)

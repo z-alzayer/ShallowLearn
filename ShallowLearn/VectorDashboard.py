@@ -10,7 +10,7 @@ import ShallowLearn.ImageHelper as ih
 from PIL import ImageDraw
 
 # Sample data loading
-original_data = np.load("/media/ziad/Expansion/Cleaned_Data_Directory/imgs.npy")
+original_data = np.load("/media/zba21/Expansion/Cleaned_Data_Directory/imgs.npy")
 
 # Preparing pixel vectors and image indices
 pixel_vectors = []
