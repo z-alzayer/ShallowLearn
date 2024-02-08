@@ -7,6 +7,8 @@ from shapely.ops import transform
 from rasterio.warp import transform_bounds
 import pyproj
 import matplotlib.pyplot as plt
+from rasterio.warp import calculate_default_transform, reproject, Resampling
+
 
 class Clipper():
     def __init__(self, shapefile, tiff, crs=32755, prj=None, limits = None):
@@ -84,6 +86,60 @@ class Clipper():
             self.single_clip_bbox(keys, fname)
 
 
+
+def align_and_clip_raster(src_raster_path, target_raster_path, output_raster_path):
+    """Clips a raster using another raster"""
+    
+    with rio.open(src_raster_path) as src_raster, rio.open(target_raster_path) as target_raster:
+        # Calculate the transformation and dimensions for aligning the rasters
+        transform, width, height = calculate_default_transform(
+            src_raster.crs, target_raster.crs, target_raster.width, target_raster.height, *target_raster.bounds)
+        
+        # Define metadata for the output raster
+        out_meta = src_raster.meta.copy()
+        out_meta.update({
+            'crs': target_raster.crs,
+            'transform': transform,
+            'width': width,
+            'height': height
+        })
+
+        # Reproject and resample the source raster
+        with rio.open(output_raster_path, 'w', **out_meta) as out_raster:
+            for i in range(1, src_raster.count + 1):
+                reproject(
+                    source=rio.band(src_raster, i),
+                    destination=rio.band(out_raster, i),
+                    src_transform=src_raster.transform,
+                    src_crs=src_raster.crs,
+                    dst_transform=transform,
+                    dst_crs=target_raster.crs,
+                    resampling=Resampling.nearest)
+
+    # Convert the bounding box to a GeoJSON feature
+    bbox = target_raster.bounds
+    geom = {
+        "type": "Polygon",
+        "coordinates": [[
+            [bbox.left, bbox.bottom],
+            [bbox.left, bbox.top],
+            [bbox.right, bbox.top],
+            [bbox.right, bbox.bottom],
+            [bbox.left, bbox.bottom]
+        ]]
+    }
+
+    # Clip the reprojected raster using the target raster's bounds
+    with rio.open(output_raster_path) as out_raster:
+        out_image, out_transform = mask.mask(out_raster, [geom], crop=True)
+        out_meta = out_raster.meta.copy()
+        out_meta.update({"driver": "GTiff", "height": out_image.shape[1], "width": out_image.shape[2], "transform": out_transform})
+
+    # Write the clipped raster to a new file
+    with rio.open('clipped_output.tif', 'w', **out_meta) as final_raster:
+        final_raster.write(out_image)
+
+
 def create_directory_if_not_exists(directory_path):
     if not os.path.exists(directory_path):
         os.makedirs(directory_path)
@@ -95,13 +151,14 @@ limits  = ((-14.4637,145.1483),(-15.4559,146.1532))
 
 if __name__ == "__main__":
     shape_path = "Data/14_001_WCMC008_CoralReefs2018_v4_1/01_Data/WCMC008_CoralReef2018_Py_v4_1.shp"
-    output_dir = "/mnt/sda_mount/Clipped/allan/"
-    raw_files = "/home/zba21/Documents/ShallowLearn/Data/"
+    output_dir = "/mnt/sda_mount/Clipped/GBR_2017/"
+    raw_files = "/mnt/sda_mount/GBR_2017/"
     files = get_files_with_extension(raw_files, ".tif")
-    files = [i for i in files if 'reprojected' in i]
+    files = [i for i in files if 'benthic_2' in i]
 
     # files = [i for i in files if 'udm2' not in i]
     for file in files:
+        print(file)
         create_directory_if_not_exists(os.path.join(output_dir, file[:-4]))
         output_directory = os.path.join(output_dir, file[:-4])
         print(output_directory)        

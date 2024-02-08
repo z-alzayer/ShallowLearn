@@ -1,6 +1,8 @@
 import numpy as np
 from sklearn.preprocessing import minmax_scale
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+
 import joblib
 from skimage.color import rgb2lab, rgb2hsv, rgb2ycbcr
 from ShallowLearn.band_mapping import band_mapping
@@ -258,6 +260,36 @@ def generate_multichannel_mask(img, mask=None, mask_val=9):
         rescaled_image[:, :, i] = (final_mask[:, :, i] - channel_min) / (channel_max - channel_min) * 255
     return rescaled_image
 
+
+def plot_with_legend(array, value_dict):
+    """
+    Plots a 2D array with a legend using distinct colors for discrete class labels.
+
+    Parameters:
+    array (2D numpy array): The array to be plotted.
+    value_dict (dict): A dictionary mapping values in the array to labels.
+    """
+    
+    # Create a colormap with a distinct color for each class
+    n_classes = len(value_dict)
+    cmap = plt.cm.get_cmap('Set3', n_classes)  # 'tab10' or 'Set3'
+
+    # Create the plot
+    plt.imshow(array, cmap=cmap)
+
+    # Create a color map index for each discrete value
+    colors = [cmap(i) for i in range(n_classes)]
+
+    # Create a legend
+    patches = [mpatches.Patch(color=colors[i], label=label) for i, (value, label) in enumerate(value_dict.items())]
+    
+    # Add the legend to the plot
+    plt.legend(handles=patches, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+
+    # Show the plot
+    plt.show()
+
+
 def plot_histogram(img,  plot=True, bins=50, min_value=1, title=None):
     """
     Plots histogram for a specific channel in the input image.
@@ -439,6 +471,7 @@ def discrete_implotv2(arr, ax=None, string_labels=None, change_colors=None, pixe
         return fig
     if show_plot:
         plt.show()
+        
 def add_north_arrow(ax, relative_position=(0.05, 0.05), arrow_length=0.05, text_offset=-0.02):
     """Add a north arrow to the axis."""
     xlim, ylim = ax.get_xlim(), ax.get_ylim()
@@ -494,3 +527,27 @@ def plot_geotiff(image_data, bounds, title="Map with coordinates", ax = None):
     ax.set_xlabel("Easting (m)")
     ax.set_ylabel("Northing (m)")
     
+def median_without_zeros_or_nans(images):
+    """
+    Computes the median of each band in each image, excluding zeros and NaN values.
+
+    Parameters:
+    - images: numpy array, shape (i, x, y, z)
+      The input 4D array of images.
+
+    Returns:
+    - medians: numpy array, shape (i, z)
+      The median values for each band in each image, excluding zeros and NaNs.
+    """
+    num_images = images.shape[0]
+    num_bands = images.shape[3]
+    medians = np.zeros((num_images, num_bands))
+
+    for i in range(num_images):
+        for z in range(num_bands):
+            band_data = images[i, :, :, z]
+            # Mask zeros and NaNs
+            masked_data = np.ma.masked_where((band_data == 0) | np.isnan(band_data), band_data)
+            medians[i, z] = np.ma.median(masked_data)
+
+    return medians

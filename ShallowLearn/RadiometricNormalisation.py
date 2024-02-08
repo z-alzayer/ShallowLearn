@@ -184,7 +184,7 @@ def pca_based_normalization(source_img, reference_img):
 
     # Create an empty array for the normalized source image with the same shape as the source_img
     normalized_img = np.empty_like(source_img)
-    # source_img = histogram_matching(source_img, reference_img)
+    source_img = histogram_matching(source_img, reference_img)
     # Assuming X number of bands, all bands are processed
     for band in range(source_img.shape[-1]):
         src_band = source_img[..., band]

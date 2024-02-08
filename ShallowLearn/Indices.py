@@ -1,6 +1,6 @@
 import numpy as np
 from ShallowLearn.band_mapping import band_mapping
-
+from ShallowLearn.PreprocDecorators import remove_zeros_decorator
 # Define constants and parameters
 MNDWI_thr = 0.2
 NDWI_thr = 0.2
@@ -20,34 +20,41 @@ nConst = 1000
 
 
 
+@remove_zeros_decorator
 def ci(image, bands=None):
     """
     Computes the Chlorophyll Index (CI) using the specified band codes.
     
     Purpose:
     The Chlorophyll Index is used to estimate chlorophyll content in vegetation. It provides information about the health and vigor of plants.
+
+    Reference: https://www.tandfonline.com/doi/pdf/10.1080/0143116042000274015?casa_token=L7WoAXpR_SkAAAAA:-Af2eztPG_JLHT66_adHNhj4zs9tX6rXZys2jVIjet0ZdWFCAsXz4s-Eq2ZOnVWBOAfLrcdVJT_-yQ
     
     Parameters:
     - image: numpy array, shape (height, width, num_bands)
       The input image array.
     - bands: list of str, optional
-      The band codes to use for computing the index. Default is ['B04', 'B05', 'B08'].
+      The band codes to use for computing the index. Default is ['B04', 'B05', 'B06', 'B07']
     
     Returns:
     - ci: numpy array, shape (height, width)
       The computed Chlorophyll Index.
     """
     if bands is None:
-        bands = ['B04', 'B05', 'B08']  # Default band codes
+        bands = ['B04', 'B05', 'B06', 'B07']  # Default band codes
     band_numbers = get_band_numbers(bands)
     validate_band_shape(image, band_numbers)
-    red_band = image[:, :, band_numbers[0]]
-    red_edge_band = image[:, :, band_numbers[1]]
-    nir_band = image[:, :, band_numbers[2]]
-    ci = (nir_band - red_band) / (nir_band + red_band + red_edge_band)
-    return ci
+    r665 = image[:, :, band_numbers[0]]
+    r705 = image[:, :, band_numbers[1]]
+    r740 = image[:, :, band_numbers[2]]
+    r783 = image[:, :, band_numbers[3]]
 
+    ri = r665 + r783
 
+    rep = 700 + 40 * (ri - r705) / ((r740 + r705) + 1) # Avoid division by zero
+    return rep
+
+@remove_zeros_decorator
 def oci(image, bands=None):
     """
     Computes the Ocean Color Index (OCI) using the specified band codes.
@@ -55,6 +62,8 @@ def oci(image, bands=None):
     Purpose:
     The Ocean Color Index is used to assess ocean color properties, particularly the presence of chlorophyll. It helps in studying phytoplankton abundance and water quality in marine environments.
     
+    reference: https://www.sciencedirect.com/science/article/pii/S0034425709001710?casa_token=b3lUx1eEEpcAAAAA:xD37DQIjMsdznvPETd0Ex9oWHid0XsQwXyt6B_N5E3pd-tk145ffxv3RqY2FtelBqk0ubYuAPAg
+
     Parameters:
     - image: numpy array, shape (height, width, num_bands)
       The input image array.
@@ -66,18 +75,50 @@ def oci(image, bands=None):
       The computed Ocean Color Index.
     """
     if bands is None:
-        bands = ['B03', 'B12']  # Default band codes
+        bands = ['B04','B08','B12']  # Default band codes
     band_numbers = get_band_numbers(bands)
     validate_band_shape(image, band_numbers)
-    green_band = image[:, :, band_numbers[0]].astype(float)
-    swir_band = image[:, :, band_numbers[1]].astype(float)
-    
+    red = image[:, :, band_numbers[0]]
+    nir = image[:, :, band_numbers[1]]
+    swir = image[:, :, band_numbers[2]]
+    fai = red + (swir - red) * (nir - red) / ((swir - red) + 1) # Avoid division by zero
     # Avoid division by zero
-    swir_band[swir_band == 0] = np.nan
+    # swir_band[swir_band == 0] = np.nan
     
-    oci = (green_band / swir_band) - 1
-    return oci
+    # oci = (green_band / swir_band) - 1
+    return fai
 
+@remove_zeros_decorator
+def cl_oci(image, bands=None):
+    """
+    Computes the Ocean Color Index (OCI) using the specified band codes.
+    
+    Purpose:
+    The Ocean Color Index is used to assess ocean color properties, particularly the presence of chlorophyll. It helps in studying phytoplankton abundance and water quality in marine environments.
+    
+    reference: https://agupubs.onlinelibrary.wiley.com/doi/pdfdirect/10.1029/2019JC015498
+
+    Parameters:
+    - image: numpy array, shape (height, width, num_bands)
+      The input image array.
+    - bands: list of str, optional
+      The band codes to use for computing the index. Default is ['B03', 'B12'].
+    
+    Returns:
+    - oci: numpy array, shape (height, width)
+      The computed Ocean Color Index.
+    """
+    if bands is None:
+        bands = ['B02','B03','B04']  # Default band codes
+    band_numbers = get_band_numbers(bands)
+    validate_band_shape(image, band_numbers)
+    blue = image[:, :, band_numbers[0]]
+    green = image[:, :, band_numbers[1]]
+    red = image[:, :, band_numbers[2]]
+    cl_oci = green - ((blue) + (green - blue)) / (red - blue) * (red - blue) + 1
+    return cl_oci
+
+@remove_zeros_decorator
 def ssi(image, bands=None):
     """
     Computes the Suspended Sediment Index (SSI) using the specified band codes.
@@ -105,6 +146,7 @@ def ssi(image, bands=None):
     ssi = (nir_band - red_band) / (nir_band + red_band + red_edge_band)
     return ssi
 
+@remove_zeros_decorator
 def ti(image, bands=None):
     """
     Computes the Turbidity Index (TI) using the specified band codes.
@@ -140,7 +182,7 @@ def ti(image, bands=None):
     ti = np.nan_to_num(ti, nan=0.0)  # Replace NaN values with 0.0
     
     return ti
-
+@remove_zeros_decorator
 def wqi(image, bands=None):
     """
     Computes the Water Quality Index (WQI) using the specified band codes.
@@ -169,6 +211,7 @@ def wqi(image, bands=None):
     wqi = (blue_band + green_band + red_band + nir_band) / 4
     return wqi
 
+@remove_zeros_decorator
 def ndci(image, bands=None):
     """
     Computes the Normalized Difference Chlorophyll Index (NDCI) using the specified band codes.
@@ -194,6 +237,33 @@ def ndci(image, bands=None):
     red_edge_band = image[:, :, band_numbers[1]]
     ndci = (green_band - red_edge_band) / (green_band + red_edge_band) + 1
     return ndci
+
+@remove_zeros_decorator
+def cloud_index(image, bands=None):
+    """
+    Computes the Cloud Index using the specified band codes.
+    
+    Purpose:
+    The Cloud Index is used to identify and estimate the presence of clouds in satellite images. High values typically indicate the presence of clouds.
+    
+    Parameters:
+    - image: numpy array, shape (height, width, num_bands)
+      The input image array.
+    - bands: list of str, optional
+      The band codes to use for computing the index. Default is ['B08', 'B11'].
+    
+    Returns:
+    - ci: numpy array, shape (height, width)
+      The computed Cloud Index.
+    """
+    if bands is None:
+        bands = ['B08', 'B11']  # Default band codes for NIR and SWIR
+    band_numbers = get_band_numbers(bands)
+    validate_band_shape(image, band_numbers)
+    nir_band = image[:, :, band_numbers[0]]
+    swir_band = image[:, :, band_numbers[1]]
+    ci = swir_band / nir_band
+    return ci
 
 # def wbei(image, bands=None):
 #     """
@@ -221,7 +291,7 @@ def ndci(image, bands=None):
 #     blue_band = image[:, :, band_numbers[2]]
 #     wbei = (green_band - red_band) / (green_band + red_band + blue_band)
 #     return wbei
-
+@remove_zeros_decorator
 def bgr(image, bands=None):
     """
     Computes the Blue to Green Ratio (BGR) using the specified band codes.
@@ -252,7 +322,6 @@ def bgr(image, bands=None):
     
     bgr = blue_band / green_band
     return bgr
-
 def mask_land(image, land_band='B11', threshold=10):
     """
     Masks out the land areas in an image using the specified land band.
@@ -297,6 +366,7 @@ def validate_band_shape(image, bands):
     if len(image.shape) < 3 or image.shape[2] < max(bands) + 1:
         raise ValueError("Invalid band shape in the image array.")
 
+@remove_zeros_decorator
 def calculate_water_surface_index(band_array, bands = None):
     """
     Calculates Water Surface Index based on multiple spectral indices.
@@ -324,6 +394,7 @@ def calculate_water_surface_index(band_array, bands = None):
 
 
 # Function to calculate pseudo Subsurface Depth
+@remove_zeros_decorator
 def calculate_pseudo_subsurface_depth(band_array, bands = None):
     """
     Calculates pseudo Subsurface Depth based on the logarithmic ratio of the blue band to the green or red band.
@@ -348,6 +419,7 @@ def calculate_pseudo_subsurface_depth(band_array, bands = None):
 
 
 # Function to calculate actual Subsurface Depth
+@remove_zeros_decorator
 def calculate_subsurface_depth(pseudo_SDB):
     """
     Calculates actual Subsurface Depth from the pseudo Subsurface Depth using a linear transformation.

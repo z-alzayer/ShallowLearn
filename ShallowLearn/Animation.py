@@ -5,6 +5,19 @@ import imageio
 from PIL import Image
 import ShallowLearn.ImageHelper as ih
 
+
+from datetime import datetime
+
+def extract_date(filename):
+    try:
+        # Extract the date string from the filename
+        # Adjust the split logic as per your filename format
+        date_str = filename.split('_')[3]  # Assuming the date is the fourth element after splitting by '_'
+        return datetime.strptime(date_str, '%Y%m%dT%H%M%S')
+    except ValueError:
+        # Return a default value if the date string is not in the expected format
+        return datetime.min
+
 def create_gif_from_images(image_paths, output_gif_path, filter_string=".tiff", corrected_npy_suffix="Corrected_Images.npy", gif_duration=0.5):
     # Filter out the desired images based on the filter_string
     desired_images = [i for i in image_paths if filter_string in i]
@@ -48,8 +61,9 @@ def create_gif(directory_path, output_filepath):
     png_files = [f for f in file_list if f.endswith('.png')]
     
     # Sort files by modification date
-    png_files.sort(key=lambda x: os.path.getmtime(os.path.join(directory_path, x)))
-    
+    # png_files.sort(key=lambda x: os.path.getmtime(os.path.join(directory_path, x)))
+    # sort by string variable
+    png_files.sort(key=extract_date)
     # Create a list to hold the images
     images = []
     
@@ -64,7 +78,7 @@ def create_gif(directory_path, output_filepath):
     
     print(f"GIF saved at: {output_filepath}")
 
-create_gif('/home/zba21/Documents/ShallowLearn/Animations/', '/home/zba21/Documents/ShallowLearn/Animations/prediction_reef_patch_34.gif')
+create_gif('/home/zba21/Documents/ShallowLearn/Graphs/Neural_Network_Test/', '/home/zba21/Documents/ShallowLearn/Animations/Prediction_Ribbon_Reef_NeuralNetwork.gif')
 
 # path = "/media/zba21/Expansion/Cleaned_Data_Directory"
 # image_paths = fp.list_files_in_dir("/media/zba21/Expansion/Cleaned_Data_Directory")

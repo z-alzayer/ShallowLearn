@@ -127,7 +127,10 @@ def highlight_pixel(img, x, y, size=5, color=(255, 0, 0)):
 )
 def update_image_and_highlight(hoverData):
     if hoverData is None:
-        return dash.no_update, dash.no_update
+        # If there's no hover data, we still need to return valid data for both outputs.
+        # The src for the image can be an empty string, which is a valid src and won't change the current image.
+        # The figure should not be updated, so we return dash.no_update.
+        return '', dash.no_update
     
     # Get the index of the point
     point_idx = hoverData['points'][0]['pointIndex']
@@ -141,11 +144,11 @@ def update_image_and_highlight(hoverData):
     # Use modulo operation to get the pixel position within the specific image
     relative_pixel_position = random_indices[point_idx] % num_pixels_single_image
 
-    pixel_y, pixel_x, _ = np.unravel_index(relative_pixel_position, original_data[source_image_idx].shape)
+    pixel_y, pixel_x = np.unravel_index(relative_pixel_position, original_data[source_image_idx].shape[:2])
     
     # Get the corresponding source image
-    img_array = original_data[source_image_idx].copy()
-    img = Image.fromarray(ih.plot_rgb(img_array))
+    img_array = ih.plot_rgb(original_data[source_image_idx].copy())
+    img = Image.fromarray(img_array)  # Ensure img_array is a numpy array suitable for Image.fromarray()
     
     # Highlight the specific pixel
     img = highlight_pixel(img, pixel_x, pixel_y)
@@ -160,7 +163,7 @@ def update_image_and_highlight(hoverData):
     fig['data'][1]['x'] = [highlighted_x]
     fig['data'][1]['y'] = [highlighted_y]
     
+    # Since we're updating both the image and the figure, we return both values.
     return f"data:image/png;base64,{img_str}", fig
-
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(debug=True, host = '0.0.0.0', port = 8888)
