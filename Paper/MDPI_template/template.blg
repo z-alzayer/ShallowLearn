@@ -2,53 +2,56 @@ This is BibTeX, Version 0.99d (TeX Live 2022/dev/Debian)
 Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
 The top-level auxiliary file: template.aux
 The style file: Definitions/mdpi.bst
-Illegal, another \bibstyle command---line 71 of file template.aux
+Illegal, another \bibstyle command---line 115 of file template.aux
  : \bibstyle
  :          {plainnat}
 I'm skipping whatever remains of this command
 Database file #1: export.bib
 Warning--entry type for "Hedley2016" isn't style-file defined
 --line 1227 of file export.bib
+Warning--string name "jun" is undefined
+--line 1648 of file export.bib
+Warning--empty booktitle in sen2cor_proceedings
 Warning--can't use both volume and number fields in macqueen1967some
-You've used 30 entries,
+You've used 46 entries,
             2885 wiz_defined-function locations,
-            768 strings with 11168 characters,
-and the built_in function-call counts, 13219 in all, are:
-= -- 1088
-> -- 962
-< -- 16
-+ -- 422
-- -- 261
-* -- 1188
-:= -- 2054
-add.period$ -- 95
-call.type$ -- 30
-change.case$ -- 30
-chr.to.int$ -- 30
-cite$ -- 30
-duplicate$ -- 564
-empty$ -- 971
-format.name$ -- 326
-if$ -- 2745
+            871 strings with 15309 characters,
+and the built_in function-call counts, 20282 in all, are:
+= -- 1663
+> -- 1469
+< -- 24
++ -- 645
+- -- 399
+* -- 1837
+:= -- 3148
+add.period$ -- 149
+call.type$ -- 46
+change.case$ -- 46
+chr.to.int$ -- 46
+cite$ -- 47
+duplicate$ -- 866
+empty$ -- 1506
+format.name$ -- 496
+if$ -- 4215
 int.to.chr$ -- 1
-int.to.str$ -- 30
-missing$ -- 30
-newline$ -- 154
-num.names$ -- 88
-pop$ -- 280
+int.to.str$ -- 46
+missing$ -- 45
+newline$ -- 239
+num.names$ -- 136
+pop$ -- 437
 preamble$ -- 0
-purify$ -- 30
+purify$ -- 46
 quote$ -- 0
-skip$ -- 418
+skip$ -- 624
 stack$ -- 0
-substring$ -- 567
-swap$ -- 133
-text.length$ -- 5
+substring$ -- 854
+swap$ -- 199
+text.length$ -- 7
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 204
-warning$ -- 1
-while$ -- 97
+type$ -- 316
+warning$ -- 2
+while$ -- 152
 width$ -- 0
-write$ -- 369
+write$ -- 576
 (There was 1 error message)

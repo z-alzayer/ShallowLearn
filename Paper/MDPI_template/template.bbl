@@ -112,6 +112,55 @@ Li, J.; Knapp, D.E.; Fabina, N.S.; Kennedy, E.V.; Larsen, K.; Lyons, M.B.;
 \newblock {\em Coral Reefs} {\bf 2020}, {\em 39},~1805--1815.
 \newblock {\url{https://doi.org/10.1007/s00338-020-02005-6}}.
 
+\bibitem[Main-Knorn et~al.(2017)Main-Knorn, Pflug, Louis, Debaecker,
+  Müller-Wilm, and Gascon]{sen2cor_proceedings}
+Main-Knorn, M.; Pflug, B.; Louis, J.; Debaecker, V.; Müller-Wilm, U.; Gascon,
+  F.
+\newblock Sen2Cor for Sentinel-2.
+\newblock  10 2017, p.~3.
+\newblock {\url{https://doi.org/10.1117/12.2278218}}.
+
+\bibitem[Kaufman and Sendra(1988)]{atmospheric_correction1988}
+Kaufman, Y.J.; Sendra, C.
+\newblock Algorithm for automatic atmospheric corrections to visible and
+  near-IR satellite imagery.
+\newblock {\em International Journal of Remote Sensing} {\bf 1988}, {\em
+  9},~1357--1381,
+  \href{http://xxx.lanl.gov/abs/https://doi.org/10.1080/01431168808954942}{{\normalfont
+  [https://doi.org/10.1080/01431168808954942]}}.
+\newblock {\url{https://doi.org/10.1080/01431168808954942}}.
+
+\bibitem[Whitlock et~al.(1981)Whitlock, Poole, Usry, Houghton, Witte, Morris,
+  and Gurganus]{whitlock1981comparison}
+Whitlock, C.H.; Poole, L.R.; Usry, J.; Houghton, W.; Witte, W.; Morris, W.;
+  Gurganus, E.
+\newblock Comparison of reflectance with backscatter and absorption parameters
+  for turbid waters.
+\newblock {\em Applied optics} {\bf 1981}, {\em 20},~517--522.
+
+\bibitem[Lyzenga(1981)]{lyzenga1981remote}
+Lyzenga, D.R.
+\newblock Remote sensing of bottom reflectance and water attenuation parameters
+  in shallow water using aircraft and Landsat data.
+\newblock {\em International journal of remote sensing} {\bf 1981}, {\em
+  2},~71--82.
+
+\bibitem[Drusch et~al.(2012)Drusch, Del~Bello, Carlier, Colin, Fernandez,
+  Gascon, Hoersch, Isola, Laberinti, Martimort, et~al.]{drusch2012sentinel}
+Drusch, M.; Del~Bello, U.; Carlier, S.; Colin, O.; Fernandez, V.; Gascon, F.;
+  Hoersch, B.; Isola, C.; Laberinti, P.; Martimort, P.;  et~al.
+\newblock Sentinel-2: ESA's optical high-resolution mission for GMES
+  operational services.
+\newblock {\em Remote sensing of Environment} {\bf 2012}, {\em 120},~25--36.
+
+\bibitem[Louis et~al.(2016)Louis, Debaecker, Pflug, Main-Knorn, Bieniarz,
+  Mueller-Wilm, Cadau, and Gascon]{louis2016sentinel}
+Louis, J.; Debaecker, V.; Pflug, B.; Main-Knorn, M.; Bieniarz, J.;
+  Mueller-Wilm, U.; Cadau, E.; Gascon, F.
+\newblock Sentinel-2 Sen2Cor: L2A processor for users.
+\newblock In Proceedings of the Proceedings living planet symposium 2016.
+  Spacebooks Online,  2016, pp. 1--8.
+
 \bibitem[Usama et~al.(2019)Usama, Qadir, Raza, Arif, Yau, Elkhatib, Hussain,
   and Al-Fuqaha]{usama2019unsupervised}
 Usama, M.; Qadir, J.; Raza, A.; Arif, H.; Yau, K.L.A.; Elkhatib, Y.; Hussain,
@@ -141,6 +190,52 @@ Huang, X.; Xie, C.; Fang, X.; Zhang, L.
 \newblock {\em IEEE Journal of Selected Topics in Applied Earth Observations
   and Remote Sensing} {\bf 2015}, {\em 8},~2097--2110.
 
+\bibitem[Zekoll et~al.(2021)Zekoll, Main-Knorn, Alonso, Louis, Frantz, Richter,
+  and Pflug]{zekoll2021comparison}
+Zekoll, V.; Main-Knorn, M.; Alonso, K.; Louis, J.; Frantz, D.; Richter, R.;
+  Pflug, B.
+\newblock Comparison of masking algorithms for sentinel-2 imagery.
+\newblock {\em Remote sensing} {\bf 2021}, {\em 13},~137.
+
+\bibitem[Raiyani et~al.(2021)Raiyani, Gon{\c{c}}alves, Rato, Salgueiro, and
+  Marques~da Silva]{raiyani2021sentinel}
+Raiyani, K.; Gon{\c{c}}alves, T.; Rato, L.; Salgueiro, P.; Marques~da Silva,
+  J.R.
+\newblock Sentinel-2 image scene classification: A comparison between Sen2Cor
+  and a machine learning approach.
+\newblock {\em Remote Sensing} {\bf 2021}, {\em 13},~300.
+
+\bibitem[Zhang et~al.(2014)Zhang, Dong, Cui, Xue, and Zhang]{ZHANG2014136}
+Zhang, M.; Dong, Q.; Cui, T.; Xue, C.; Zhang, S.
+\newblock Suspended sediment monitoring and assessment for Yellow River estuary
+  from Landsat TM and ETM+ imagery.
+\newblock {\em Remote Sensing of Environment} {\bf 2014}, {\em 146},~136--147.
+\newblock Liege Colloquium Special Issue: Remote sensing of ocean colour,
+  temperature and salinity,
+  {\url{https://doi.org/https://doi.org/10.1016/j.rse.2013.09.033}}.
+
+\bibitem[Caballero et~al.(2018)Caballero, Steinmetz, and
+  Navarro]{caballero2018evaluation}
+Caballero, I.; Steinmetz, F.; Navarro, G.
+\newblock Evaluation of the first year of operational Sentinel-2A data for
+  retrieval of suspended solids in medium-to high-turbidity waters.
+\newblock {\em Remote Sensing} {\bf 2018}, {\em 10},~982.
+
+\bibitem[Malley and Williams(2014)]{Malley_NIR_Spectroscopy}
+Malley, D.F.; Williams, P.
+\newblock Analysis of sediments and suspended material in lake ecosystems using
+  near-infrared spectroscopy: A review.
+\newblock {\em Aquatic Ecosystem Health \& Management} {\bf 2014}, {\em
+  17},~447--453,
+  \href{http://xxx.lanl.gov/abs/https://doi.org/10.1080/14634988.2014.979311}{{\normalfont
+  [https://doi.org/10.1080/14634988.2014.979311]}}.
+\newblock {\url{https://doi.org/10.1080/14634988.2014.979311}}.
+
+\bibitem[Agency(2023)]{ESA2023}
+Agency, E.S.
+\newblock Sentinel-2 Spectral Response Functions (S2-SRF),  2023.
+\newblock Accessed January 22, 2024.
+
 \bibitem[Zhu and Woodcock(2012)]{Zhe2012}
 Zhu, Z.; Woodcock, C.
 \newblock Object-based cloud and cloud shadow detection in Landsat imagery.
@@ -163,6 +258,14 @@ Siegel, D.A.; Wang, M.; Maritorena, S.; Robinson, W.
 \newblock Atmospheric correction of satellite ocean color imagery: the black
   pixel assumption.
 \newblock {\em Applied optics} {\bf 2000}, {\em 39},~3582--3591.
+
+\bibitem[Schubert(2023)]{Schubert_2023}
+Schubert, E.
+\newblock Stop using the elbow criterion for k-means and how to choose the
+  number of clusters instead.
+\newblock {\em ACM SIGKDD Explorations Newsletter} {\bf 2023}, {\em
+  25},~36–42.
+\newblock {\url{https://doi.org/10.1145/3606274.3606278}}.
 
 \bibitem[Pearson(1901)]{pearson1901}
 Pearson, K.
@@ -196,6 +299,18 @@ Rasmussen, C.
 \newblock {\em Advances in neural information processing systems} {\bf 1999},
   {\em 12}.
 
+\bibitem[Bezdek et~al.(1984)Bezdek, Ehrlich, and Full]{bezdek1984fcm}
+Bezdek, J.C.; Ehrlich, R.; Full, W.
+\newblock FCM: The fuzzy c-means clustering algorithm.
+\newblock {\em Computers \& geosciences} {\bf 1984}, {\em 10},~191--203.
+
+\bibitem[Rousseeuw(1987)]{rousseeuw1987silhouettes}
+Rousseeuw, P.J.
+\newblock Silhouettes: a graphical aid to the interpretation and validation of
+  cluster analysis.
+\newblock {\em Journal of computational and applied mathematics} {\bf 1987},
+  {\em 20},~53--65.
+
 \bibitem[Kennedy et~al.(2021)Kennedy, Roelfsema, Lyons, Kovacs,
   Borrego-Acevedo, Roe, Phinn, Larsen, Murray, Yuwono, Wolff, and
   Tudman]{Kennedy2021}
@@ -205,5 +320,14 @@ Kennedy, E.V.; Roelfsema, C.M.; Lyons, M.B.; Kovacs, E.M.; Borrego-Acevedo, R.;
   from remote sensing.
 \newblock {\em Scientific Data} {\bf 2021}, {\em 8}.
 \newblock {\url{https://doi.org/10.1038/s41597-021-00958-z}}.
+
+\bibitem[Immordino et~al.(2019)Immordino, Barsanti, Candigliota, Cocito,
+  Delbono, and Peirano]{immordino2019application}
+Immordino, F.; Barsanti, M.; Candigliota, E.; Cocito, S.; Delbono, I.; Peirano,
+  A.
+\newblock Application of Sentinel-2 multispectral data for habitat mapping of
+  Pacific islands: Palau Republic (Micronesia, Pacific Ocean).
+\newblock {\em Journal of Marine Science and Engineering} {\bf 2019}, {\em
+  7},~316.
 
 \end{thebibliography}
