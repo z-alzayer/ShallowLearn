@@ -204,3 +204,6 @@ dependencies:
       - zipp==3.11.0
       - pytest==7.3.1
       - ipympl==0.9.3
+      - contextily
+      - matplotlib_scalebar
+      - dash
