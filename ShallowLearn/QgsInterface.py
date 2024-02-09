@@ -44,6 +44,7 @@ def write_label_raster_out(labels_reshaped, original_ds, out_name, show = True):
     driver = gdal.GetDriverByName('GTiff')
     out_raster = driver.Create(f'/tmp/{out_name}.tif', labels_reshaped.shape[1], labels_reshaped.shape[0], 1, gdal.GDT_Float32)
     out_band = out_raster.GetRasterBand(1)
+    print(out_band)
     out_band.WriteArray(labels_reshaped)
 
     # Copy the geotransform and projection from the original raster to the new one
