@@ -64,16 +64,28 @@ def write_label_raster_out(labels_reshaped, original_ds, out_name, show = True):
         iface.addRasterLayer(src_raster_path, out_name)
 
 
-def vectorize_labels(label_raster_path, out_path, qgis_name = "Vectorised Layer", field_name = "DN"):
-    """Converts a raster to a vector"""
+def vectorize_labels(label_raster_path, out_path, qgis_name="Vectorised Layer", field_name="DN", epsg_code=None):
+    """Converts a raster to a vector, optionally setting a specific EPSG for the output vector."""
 
     out_vector_path = f'/tmp/{out_path}.shp'
 
     src_ds = gdal.Open(label_raster_path)
     src_band = src_ds.GetRasterBand(1)
+
+    # Retrieve the raster's spatial reference
+    raster_srs = osr.SpatialReference()
+    raster_srs.ImportFromWkt(src_ds.GetProjection())
+
+    # If an EPSG code is provided, override the raster's spatial reference with the new one
+    if epsg_code:
+        new_srs = osr.SpatialReference()
+        new_srs.ImportFromEPSG(epsg_code)
+    else:
+        new_srs = raster_srs  # Use the raster's original spatial reference
+
     drv = ogr.GetDriverByName('ESRI Shapefile')
     out_ds = drv.CreateDataSource(out_vector_path)
-    out_layer = out_ds.CreateLayer('', srs=None)
+    out_layer = out_ds.CreateLayer('', srs=new_srs)  # Set the spatial reference for the output layer
 
     # Add a field to the layer
     new_field = ogr.FieldDefn(field_name, ogr.OFTInteger)
@@ -83,9 +95,85 @@ def vectorize_labels(label_raster_path, out_path, qgis_name = "Vectorised Layer"
     gdal.Polygonize(src_band, None, out_layer, 0, [], callback=None)
 
     out_ds = None  # Save and close the shapefile
-    vector_layer = iface.addVectorLayer(out_vector_path, f'{qgis_name}', 'ogr')
+
+    # Assuming this function is run within QGIS with access to iface
+    vector_layer = iface.addVectorLayer(out_vector_path, qgis_name, 'ogr')
+
+    return vector_layer
+def get_raster_extent(file_path):
+    """
+    Get the spatial extent of a raster file.
+    
+    Parameters:
+    - file_path: Path to the raster file.
+    
+    Returns:
+    - A tuple representing the spatial extent (minX, maxX, minY, maxY).
+    """
+    # Open the raster file
+    ds = gdal.Open(file_path)
+    if ds is None:
+        raise Exception("Could not open the raster file at {}".format(file_path))
+
+    # Get the geotransformation and dimensions
+    gt = ds.GetGeoTransform()
+    x_size = ds.RasterXSize
+    y_size = ds.RasterYSize
+
+    # Calculate the extent
+    minX = gt[0]
+    maxY = gt[3]
+    maxX = minX + (gt[1] * x_size)
+    minY = maxY + (gt[5] * y_size)
+
+    return (minX, maxX, minY, maxY)
 
 
+
+def rasterize_vector_to_match_raster(vector_path, output_raster_path, reference_raster_path, attribute_name="DN", pixel_size=10.0):
+    """
+    Rasterize a vector file to match the size and resolution of a reference raster.
+
+    Parameters:
+    - vector_path: Path to the input vector file.
+    - output_raster_path: Path where the output raster will be saved.
+    - reference_raster_path: Path to the reference raster from which dimensions and geo-transform are derived.
+    - attribute_name: Name of the attribute field in the vector file to use for rasterization values.
+    - pixel_size: The resolution of the pixels in the output raster, assumed to match the reference raster.
+    """
+    
+    # Open the reference raster to get its dimensions and geotransformation
+    ref_ds = gdal.Open(reference_raster_path)
+    if ref_ds is None:
+        raise Exception(f"Could not open reference raster: {reference_raster_path}")
+    
+    x_res = ref_ds.RasterXSize
+    y_res = ref_ds.RasterYSize
+    geo_transform = ref_ds.GetGeoTransform()
+    
+    # Create the output raster with the same dimensions and geo-transform as the reference
+    driver = gdal.GetDriverByName('GTiff')
+    out_ds = driver.Create(output_raster_path, x_res, y_res, 1, gdal.GDT_Byte)
+    if out_ds is None:
+        raise Exception("Could not create the output raster file.")
+    out_ds.SetGeoTransform(geo_transform)
+    out_ds.SetProjection(ref_ds.GetProjection())
+    
+    # Open the vector file
+    vector_ds = ogr.Open(vector_path)
+    if vector_ds is None:
+        raise Exception(f"Could not open vector file: {vector_path}")
+    vector_layer = vector_ds.GetLayer()
+    
+    # Perform rasterization using the specified attribute for values
+    gdal.RasterizeLayer(out_ds, [1], vector_layer, options=[f"ATTRIBUTE={attribute_name}"])
+    
+    # Cleanup
+    out_ds = None
+    vector_ds = None
+    ref_ds = None
+
+    print(f"Rasterization completed. Output saved to: {output_raster_path}")
 def render_layering(label_color_dict, vector_layer_name, field_name = "DN"):
     
 
