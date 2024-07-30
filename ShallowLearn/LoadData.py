@@ -4,12 +4,20 @@ import csv
 import pandas as pd
 from datetime import datetime
 import matplotlib.pyplot as plt
+from rasterio.enums import Resampling
+from osgeo import gdal
+from rasterio.warp import reproject
+from rasterio.mask import mask
+from shapely.geometry import box
+
 
 from ShallowLearn.FileProcessing import list_files_in_dir_recur
 from ShallowLearn.DateHelper import extract_dates, get_season, southern_hemisphere_meteorological_seasons, extract_individual_date
 import ShallowLearn.ImageHelper as ih
 from ShallowLearn.PreprocDecorators import remove_zeros_decorator
 from ShallowLearn.Indices import calculate_water_surface_index, mask_land, cloud_index
+from ShallowLearn.band_mapping import band_mapping
+import ShallowLearn.ResamplingMethods as rs
 
 class DataLoader:
     def __init__(self, data_source):
@@ -58,6 +66,136 @@ class LoadGeoTIFF(DataLoader):
         with rasterio.open(self.data_source) as src:
             self.bounds = src.bounds
         return self.bounds
+
+class LoadSentinel2L1C(DataLoader):
+    def __init__(self, data_source, band_mapping = band_mapping):
+        """Expects a SAFE file as a datasource"""
+        super().__init__(data_source)
+        self.band_mapping = band_mapping
+        if data_source.endswith(".xml"):
+            self.files = [data_source]
+        if data_source.endswith(".SAFE"):
+            self.files = [i for i in list_files_in_dir_recur(data_source) if "MTD_MSIL1C" in i]
+        if (len(self.files) == 0 or len(self.files) > 1):
+            raise Exception("Multiple MTD_MSIL1C files found, please double check your data")
+        self.file = self.files[0]
+
+    def load(self):
+        """Load subdatasets from the primary file"""
+        with rasterio.open(self.file) as dataset:
+            self.subdatasets = dataset.subdatasets
+            with rasterio.open(self.subdatasets[0]) as first_array:
+                ### TODO implement additional fix to take in metadata from other bands
+                ### Current implementation is just the first tags to extract useful metadata but is not complete
+                self.tags = first_array.tags()
+                self.profile = first_array.profile
+                self.metadata = first_array.meta
+                self.offsets = first_array.offsets
+                self.bounds = first_array.bounds
+
+        return self.subdatasets
+
+    def get_resolution_subdatasets(self):
+        """Retrieve subdatasets based on resolution categories"""
+        subdatasets = self.load()
+        resolutions = {
+            '10m': [s for s in subdatasets if "10m" in s],
+            '20m': [s for s in subdatasets if "20m" in s],
+            '60m': [s for s in subdatasets if "60m" in s],
+            'tci': [s for s in subdatasets if "TCI" in s]
+        }
+        return resolutions
+    def describe_bands(self):
+        """
+        Describes the bands in the datasets, identifying their purpose based on the filename and metadata.
+        """
+        resolution_datasets = self.get_resolution_subdatasets()
+        description_dict = {}
+        for key, items in resolution_datasets.items():
+            if "tci" in key:
+                continue
+            else:
+                with rasterio.open(items[0]) as ds:
+                    description_list = [i for i in ds.descriptions]
+                    description_dict[items[0]] = [i.split(",")[0] for i in description_list]
+        return description_dict
+    
+    def get_selected_bands(self, resolution = "10m", selected_bands = ['B02', 'B03', 'B04','B08']):
+        band_description = self.describe_bands()
+        width, height = rs.get_raster_dimensions(self.get_resolution_subdatasets()[resolution][0])
+        counter = len(selected_bands)
+        idx_location = len(selected_bands)
+        index_dictionary = {}
+
+        for key, item in band_mapping.items():
+            if key in selected_bands:
+                for path, band_list in band_description.items():
+                    if key[1] == "0":
+                        substring = key.replace("0","")
+                    else:
+                        substring = key
+                    if substring in band_list:
+                        band_index = band_list.index(substring) + 1
+                        index_dictionary[idx_location - counter] = [path, band_index, key]
+                        counter -= 1
+        return index_dictionary, width, height
+    
+    def construct_resampled_array(self, resolution = "10m", selected_bands = ['B02', 'B03', 'B04', 'B08']):
+        selected_bands_dict, width, height = self.get_selected_bands(resolution, selected_bands)
+        empty_array = np.zeros((width, height, len(selected_bands)))
+        for keys, items in selected_bands_dict.items():
+            empty_array[:,:,keys] = rs.resample_raster(items[0], items[1], width, height )
+        return empty_array
+    
+    def clip_raster_with_shape(self, shapes, resolution='10m', selected_bands=['B02', 'B03', 'B04', 'B08'], use_mask=True):
+        """Clip the raster with a shape from a shapefile and then resample, optionally using the shape's bounding box."""
+        selected_bands_dict, target_width, target_height = self.get_selected_bands(resolution, selected_bands)
+        clipped_and_resampled = []
+
+        final_width, final_height = None, None
+        geometry = [shapes.geometry.iloc[0]] if use_mask else [box(*shapes.geometry.iloc[0].bounds)]
+
+        # Determine the final width and height from the highest resolution band
+        for band_key, band_path in selected_bands_dict.items():
+            if resolution in band_path[0]:
+                print(band_path)
+                with rasterio.open(band_path[0]) as src:
+                    clipped_image, clipped_transform = mask(src, geometry, crop=True)
+                    clipped_height, clipped_width = clipped_image.shape[1:3]
+                    final_width, final_height = clipped_width, clipped_height
+                    break
+
+        if final_width is None or final_height is None:
+            raise ValueError("Could not determine the final width and height for resampling.")
+
+        # Clip and resample each band
+        for band_key, band_path in selected_bands_dict.items():
+            with rasterio.open(band_path[0]) as src:
+                clipped_image, clipped_transform = mask(src, geometry, crop=True)
+                resampled_data = np.empty((final_height, final_width), dtype=clipped_image.dtype)
+                
+                new_transform = rasterio.transform.from_bounds(
+                    *rasterio.transform.array_bounds(clipped_image.shape[1], clipped_image.shape[2], clipped_transform),
+                    width=final_width,
+                    height=final_height
+                )
+
+                reprojected, _ = reproject(
+                    source=clipped_image[band_path[1] - 1],
+                    destination=resampled_data,
+                    src_transform=clipped_transform,
+                    src_crs=src.crs,
+                    dst_transform=new_transform,
+                    dst_crs=src.crs,
+                    resampling=Resampling.bilinear
+                )
+
+                clipped_and_resampled.append(reprojected)
+
+        return np.array(clipped_and_resampled)
+
+
+
 
 class LoadFromCSV(DataLoader):
     """This class loads data from a CSV file. The CSV file should contain the file paths of the data to be loaded.
@@ -114,9 +252,22 @@ class LoadSeasonalData():
         self.summer_paths = []
         self.autumn_paths = []
         self.spring_paths = []
+        
         self.dates = self.generate_dates()
         self.seasons = self.gen_seasons()
         self.winter, self.summer, self.autumn, self.spring = self.gen_seasonal_images()
+
+    def generate_seasonal_dates(self, season = "Winter"):
+        """This method generates the dates from the data source"""
+        dates_dict = {"Winter":self.winter_paths,
+                       "Summer":self.summer_paths, 
+                       "Autumn":self.autumn_paths,
+                         "Spring":self.spring_paths}
+        dates = []
+
+        for file in dates_dict[season]:
+            dates.append(extract_individual_date(file))
+        return dates
 
 
     def generate_dates(self):
@@ -162,8 +313,8 @@ class LoadSeasonalData():
         img = np.swapaxes(geo_tiff_loader, 0, 2)
         img = np.swapaxes(img, 0, 1)
         # img = ih.apply_mask(img, np.expand_dims(calculate_water_surface_index(img), axis=2), fill_value = 0)
-        img = ih.apply_mask(img, mask_land(img), fill_value = 0)
-        img = ih.apply_mask(img, np.expand_dims(cloud_index(img) < 0.85, axis=2), fill_value = 0)
+        # img = ih.apply_mask(img, mask_land(img), fill_value = 0)
+        # img = ih.apply_mask(img, np.expand_dims(cloud_index(img) < 0.85, axis=2), fill_value = 0)
         return img
 
 
