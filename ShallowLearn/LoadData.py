@@ -9,7 +9,8 @@ from osgeo import gdal
 from rasterio.warp import reproject
 from rasterio.mask import mask
 from shapely.geometry import box
-
+import zipfile
+import os
 
 from ShallowLearn.FileProcessing import list_files_in_dir_recur
 from ShallowLearn.DateHelper import extract_dates, get_season, southern_hemisphere_meteorological_seasons, extract_individual_date
@@ -67,31 +68,59 @@ class LoadGeoTIFF(DataLoader):
             self.bounds = src.bounds
         return self.bounds
 
+class PVI_Dataloader(DataLoader):
+    def __init__(self, data_source):
+        self.is_zip = data_source.endswith(".zip")
+        if self.is_zip:
+            with zipfile.ZipFile(data_source, 'r') as zip_ref:
+                self.files = [f for f in zip_ref.namelist() if "PVI" in f ][0]
+        
+        self.zip_path = f"zip+file://{data_source}/{self.files}"
+        print(self.zip_path)
+    
+    def load(self):
+        with rasterio.open(self.zip_path) as dataset:
+            self.pvi_image = dataset.read()
+            self.pvi_image = np.swapaxes(self.pvi_image, 0, 2)
+            self.pvi_image = np.swapaxes(self.pvi_image, 0, 1)
+        return self.pvi_image
+    
+
 class LoadSentinel2L1C(DataLoader):
-    def __init__(self, data_source, band_mapping = band_mapping):
-        """Expects a SAFE file as a datasource"""
+    def __init__(self, data_source, band_mapping=band_mapping):
         super().__init__(data_source)
         self.band_mapping = band_mapping
-        if data_source.endswith(".xml"):
+        self.is_zip = data_source.endswith(".zip")
+
+        if self.is_zip:
+            with zipfile.ZipFile(data_source, 'r') as zip_ref:
+                self.files = [f for f in zip_ref.namelist() if "MTD_MSIL1C.xml" in f or "MTD_MSIL2A.xml" in f]
+            self.zip_path = f"/vsizip/{data_source}"
+
+        elif data_source.endswith(".xml"):
             self.files = [data_source]
-        if data_source.endswith(".SAFE"):
+        elif data_source.endswith(".SAFE"):
             self.files = [i for i in list_files_in_dir_recur(data_source) if "MTD_MSIL1C" in i]
-        if (len(self.files) == 0 or len(self.files) > 1):
-            raise Exception("Multiple MTD_MSIL1C files found, please double check your data")
+
+        if len(self.files) == 0 or len(self.files) > 1:
+            raise Exception("Multiple or no MTD_MSIL1C files found, please double check your data")
+        
         self.file = self.files[0]
+        if self.is_zip:
+            self.file = os.path.join(self.zip_path, self.file)
 
     def load(self):
         """Load subdatasets from the primary file"""
         with rasterio.open(self.file) as dataset:
             self.subdatasets = dataset.subdatasets
-            with rasterio.open(self.subdatasets[0]) as first_array:
-                ### TODO implement additional fix to take in metadata from other bands
-                ### Current implementation is just the first tags to extract useful metadata but is not complete
-                self.tags = first_array.tags()
-                self.profile = first_array.profile
-                self.metadata = first_array.meta
-                self.offsets = first_array.offsets
-                self.bounds = first_array.bounds
+
+        # Open the first subdataset
+        with rasterio.open(self.subdatasets[0]) as first_array:
+            self.tags = first_array.tags()
+            self.profile = first_array.profile
+            self.metadata = first_array.meta
+            self.offsets = first_array.offsets
+            self.bounds = first_array.bounds
 
         return self.subdatasets
 
