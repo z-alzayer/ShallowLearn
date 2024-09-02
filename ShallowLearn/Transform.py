@@ -82,7 +82,7 @@ def linear_contrast_enhancement(image, max_value=255):
     image[mask_nan] = 0
 
     # Get the minimum value from non-zero elements of the image
-    min_intensity = np.min(image[np.nonzero(image)])
+    min_intensity = np.min(image[np.nonzero(image)]) + 0.001
 
     # Get the maximum value from the image
     max_intensity = np.max(image)

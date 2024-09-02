@@ -72,8 +72,11 @@ class PVI_Dataloader(DataLoader):
     def __init__(self, data_source):
         self.is_zip = data_source.endswith(".zip")
         if self.is_zip:
-            with zipfile.ZipFile(data_source, 'r') as zip_ref:
-                self.files = [f for f in zip_ref.namelist() if "PVI" in f ][0]
+            try:
+                with zipfile.ZipFile(data_source, 'r') as zip_ref:
+                    self.files = [f for f in zip_ref.namelist() if "PVI" in f ][0]
+            except:
+                print(f"File: {data_source} failed. Please double check integrity of file")
         
         self.zip_path = f"zip+file://{data_source}/{self.files}"
         print(self.zip_path)

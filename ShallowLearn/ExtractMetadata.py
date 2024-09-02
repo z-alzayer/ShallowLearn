@@ -7,9 +7,13 @@ import ShallowLearn.Util as utilities
 import ShallowLearn.QuickLook as quicklook
 
 
-def generate_metadata_dataframe(directory):
+def generate_metadata_dataframe(directory, gen_from_zips = False):
     """Generates a dataframe from the metadata of all of the imagery"""
-    mtd_file_paths = fp.extract_MTD_files(directory)
+    print(directory)
+    if gen_from_zips is False:
+        mtd_file_paths = fp.extract_MTD_files(directory)
+    else:
+        mtd_file_paths = directory
     metadata = {}
     for file in mtd_file_paths:
         data_loader = ld.LoadSentinel2L1C(file)
@@ -22,9 +26,9 @@ def generate_metadata_dataframe(directory):
     
     return df
 
-def combine_metadata_w_pvi_analysis(directory, quick_look, verbose=False):
-    df = generate_metadata_dataframe(directory)
-    
+def combine_metadata_w_pvi_analysis(directory, quick_look, verbose=False, gen_from_zips = False):
+    df = generate_metadata_dataframe(directory, gen_from_zips = gen_from_zips)
+    print(df)
     # Extract common component for dataframe and file_list
     df['COMMON_COMPONENT'] = df['FILE_PATH'].apply(extract_common_component)
     common_components_list = [extract_common_component(path) for path in quick_look.files]
@@ -58,7 +62,7 @@ def combine_metadata_w_pvi_analysis(directory, quick_look, verbose=False):
         quick_look.imagery = filtered_imagery
         common_components_list = [extract_common_component(path) for path in quick_look.files]
         order_mapping = {component: i for i, component in enumerate(common_components_list)}
-
+    print(df)
     # Sort the dataframe based on the common component order
     df['ORDER'] = df['COMMON_COMPONENT'].map(order_mapping)
     df_sorted = df.sort_values('ORDER').drop(columns=['ORDER'])

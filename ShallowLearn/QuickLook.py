@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 
 import ShallowLearn.FileProcessing as fp
-from ShallowLearn.LoadData import LoadSentinel2L1C as load_sen2
+from ShallowLearn.LoadData import LoadSentinel2L1C as load_sen2, PVI_Dataloader
 import ShallowLearn.ExtractMetadata as extract_meta
 from ShallowLearn.band_mapping import band_mapping
 from ShallowLearn.Util import clip_image
@@ -64,7 +64,8 @@ class QuickLookModel():
     """Abstract base class implementation do not use"""
     def __init__(self, files, model = None):
         self.PVI = None
-
+        self.imagery = []
+        self.pca_model = PCA()
 
 
     def create_custom_pastel_cmap(self, labels):
@@ -95,7 +96,7 @@ class QuickLookModel():
             dbscan_model.fit(transformed_data)
             return dbscan_model.labels_ 
     
-    def generate_dataframe():
+    def generate_dataframe(self):
         raise Exception("Not implemented in baseclass")
 
 
@@ -237,9 +238,12 @@ class QuickLookPVI(QuickLookModel):
     def __init__(self, files, model = None):
         super().__init__(files, model)
         self.PVI = True
-        if os.path.isdir(files):
+        if  len(files) <= 1 and os.path.isdir(files):
             files = fp.extract_pvi_images(files)
+            self.load_zips = False
             # print(files)
+        elif len(files) > 1 and files[0].endswith(".zip"):
+            self.load_zips = True
         elif isinstance(files, list):
             print("Starting PCA Model")
         else:
@@ -254,13 +258,30 @@ class QuickLookPVI(QuickLookModel):
 
     def load_data(self):
         imagery = []
-        for file in self.files:
-            with Image.open(file) as im:
-                imagery.append(np.array(im))
+        files = []
+
+        if self.load_zips is False:
+            for file in self.files:
+                with Image.open(file) as im:
+                    imagery.append(np.array(im))
+        else:
+            for file in self.files:
+                try:
+                    img = PVI_Dataloader(file).load()
+                    imagery.append(img)
+                    files.append(file)
+                except:
+                    print(f"File Failed to load {file}")
+        self.files = files
         return imagery
+
     
-    def generate_dataframe(self, directory):
-        return extract_meta.combine_metadata_w_pvi_analysis(directory, self)
+    def generate_dataframe(self, directory, zips = False):
+        if zips:
+            return extract_meta.combine_metadata_w_pvi_analysis(self.files, self, 
+                                                            gen_from_zips = zips)
+        return extract_meta.combine_metadata_w_pvi_analysis(directory, self, 
+                                                            gen_from_zips = zips)
 
 
 class QuickLookArea(QuickLookModel):
@@ -279,25 +300,32 @@ class QuickLookArea(QuickLookModel):
         print("Data loading finished")
         components = 0.95
         self.pca_model = PCA(n_components = components)  
+        self.df = self.filter_dataframe_by_file_path(df, self.files)
         self.transformed_data = self.train()
         self.labels = self.predict()
         self.df['Label'] = self.labels
 
+    def train(self):
+        transformed_imagery = np.array(self.imagery).reshape(len(self.imagery), -1) / 10_000
+        transformed_data = self.pca_model.fit_transform(transformed_imagery)
+        return transformed_data
+    
     def load_data(self, band_mapping = ['B02', 'B03', 'B04', 'B08'], resolution = "10m"):
         imagery = []
         self.updated_files = []
         for file in tqdm(self.files, desc="Processing files"):
-            print(file)
+            # print(file)
             image = load_sen2(file)
             clipped = image.clip_raster_with_shape(self.shapefile, resolution,
                                                    selected_bands=band_mapping, use_mask=False)
             # bit hacky - fix in dataloader
-            if "N0400" in file:
+            if "N0400" in file or "N0500" in file or "N0509" in file or "N0510" in file:
                 clipped -= 1000
             try:
                 clipped = np.swapaxes(clipped, 0, 2)
                 if self.stretch_type is not None:
                     clipped = self.stretch_type(clipped)
+                
                 clipped = clip_image(clipped, clip_percent=2)
                 # clipped = trf.LCE_multi(clipped)
                 imagery.append(clipped)
@@ -307,9 +335,24 @@ class QuickLookArea(QuickLookModel):
             
         self.files = self.updated_files
         return imagery
-    
+        
     def generate_dataframe(self):
         return self.df
+
+    def filter_dataframe_by_file_path(self, df, valid_file_paths):
+        """
+        Drops rows from a DataFrame based on values in the 'FILE_PATH' column 
+        that are not present in the provided list of valid file paths.
+
+        Parameters:
+        - df: The DataFrame to filter.
+        - valid_file_paths: A list of valid file paths. Rows with 'FILE_PATH' not in this list will be dropped.
+
+        Returns:
+        - A filtered DataFrame with only rows that have 'FILE_PATH' values in the valid_file_paths list.
+        """
+        filtered_df = df[df['FILE_PATH'].isin(valid_file_paths)]
+        return filtered_df
 
     def predict(self, model = None, n_components = 4):
         if model is None:
