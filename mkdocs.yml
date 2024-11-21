@@ -18,14 +18,13 @@ theme:
     - navigation.instant
     - navigation.tracking
     - navigation.tabs
-   # - navigation.sections
     - navigation.indexes
     - content.code.annotate
     - content.code.copy
     - content.tooltips
 
 extra_css:
-- stylesheets/extra.css
+  - stylesheets/extra.css
 
 markdown_extensions:
   - admonition
@@ -54,3 +53,18 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - tables
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+            paths:
+              - ShallowLearn/  y
+
+nav:
+  - Home: index.md
+  - API Reference:
+      - Module Name: api_reference.md
