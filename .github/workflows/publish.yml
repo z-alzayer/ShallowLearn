@@ -4,23 +4,34 @@ on:
   push:
     branches:
       - master
+
 permissions:
   contents: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      # Check out the repository
       - uses: actions/checkout@v4
+
+      # Set up Python
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
-      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV 
+
+      # Cache dependencies
+      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
       - uses: actions/cache@v4
         with:
           key: mkdocs-material-${{ env.cache_id }}
           path: .cache
           restore-keys: |
             mkdocs-material-
-      - run: pip install mkdocs-material 
-      - run: pip install mkdocstrings-python
+
+      # Install dependencies
+      - run: pip install mkdocs-material mkdocstrings-python
+      - run: pip install -e .  # Ensure your package is installed
+
+      # Build and deploy the documentation
       - run: mkdocs gh-deploy --force
