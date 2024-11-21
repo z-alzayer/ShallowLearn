@@ -1,5 +1,6 @@
 site_name: My Project
 site_url: https://imperialcollegelondon.github.io/myproject
+docs_dir: docs
 theme:
   name: material
   palette:
