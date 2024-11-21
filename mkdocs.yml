@@ -55,8 +55,11 @@ markdown_extensions:
   - tables
 
 plugins:
-  - search
-  - mkdocstrings
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
 
 nav:
   - Home: index.md
