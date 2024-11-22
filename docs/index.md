@@ -13,6 +13,6 @@ ShallowLearn is a Python package designed for shallow water imaging and machine 
 
 - [Installation](installation.md)
 - [Quickstart Guide](quickstart.md)
-- [API Reference](modules.md)
+- [API Reference](api_reference.md)
 
 Explore the documentation for tutorials, usage examples, and detailed API references.
