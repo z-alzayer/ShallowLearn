@@ -12,12 +12,12 @@ theme:
     text: Roboto
     code: Roboto Mono
   
-  logo: assets/Logo23.png
+  logo: assets/logo.png
   extra:
     logo:
         width: 600  # Set your desired width in pixels
         height: 600  # Maintain aspect ratio
-  favicon: assets/Logo23.png
+  favicon: assets/logo.png
 
   features:
     - navigation.instant
