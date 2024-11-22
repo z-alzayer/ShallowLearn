@@ -31,7 +31,9 @@ jobs:
 
       # Install dependencies
       - run: pip install mkdocs-material mkdocstrings-python
+      - run: ls -R docs
       - run: pip install -e .  # Ensure your package is installed
-
+      - run: mkdocs build --verbose
+      - run: ls -R site
       # Build and deploy the documentation
       - run: mkdocs gh-deploy --force
