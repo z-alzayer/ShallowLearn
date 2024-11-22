@@ -21,3 +21,6 @@
 ::: ShallowLearn.QuickLook
     options:
       show_source: true
+::: ShallowLearn.Util
+    options:
+      show_source: true
