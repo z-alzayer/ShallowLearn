@@ -11,7 +11,26 @@ from ShallowLearn import LoadData
 from matplotlib.colors import ListedColormap, to_rgba
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 
-def load_img(path, return_meta=False):
+
+
+def clip_array(arr):
+    """
+    Clips an input multiband array to values between 0 and 10,000, removing any negative values.
+
+    Parameters:
+    arr (np.ndarray): A NumPy array of any shape.
+
+    Returns:
+    np.ndarray: A clipped NumPy array with the same shape as input, where all values are >= 0 and <= 10,000.
+    """
+    # Use np.clip to clip values of the array to a min of 0 and a max of 10,000
+    # np.clip automatically handles the removal of negative values by setting the minimum to 0
+    clipped_arr = np.clip(arr, 0, 10000)
+    
+    return clipped_arr
+
+
+def load_img(path, return_meta=False, clip = True):
     """
     Loads an image from the specified path.
 
@@ -23,10 +42,13 @@ def load_img(path, return_meta=False):
 
     """
     img = LoadData.LoadGeoTIFF(path).load()
-    
+    if "N0400" in path:
+        img -= 1000     
     img = np.swapaxes(img, 0, 2)
     img = np.swapaxes(img, 0, 1)
-
+    if clip:
+        img = clip_array(img)
+        
     if return_meta:
         return img, LoadData.LoadGeoTIFF(path).get_metadata(), LoadData.LoadGeoTIFF(path).get_bounds()
     return img
@@ -322,7 +344,7 @@ def plot_histogram(img,  plot=True, bins=50, min_value=1, title=None):
 
 
 
-def plot_histograms(img, plot=True, bins=50, min_value=1, channel_legend=None, title = None):
+def plot_histograms(img, plot=True, bins=50, min_value=1, channel_legend=None, title = None, return_fig = False):
     """
     Plots histograms for each channel in the input image using line plots.
 
@@ -359,11 +381,14 @@ def plot_histograms(img, plot=True, bins=50, min_value=1, channel_legend=None, t
         # Customize the plot
         plt.xlabel('Value')
         plt.ylabel('Frequency')
+        plt.legend()
+
         if title is None:
             plt.title('Histogram of Each Channel')
         else:
             plt.title(title)
-        plt.legend()
+        if return_fig:
+            return plt.gcf()
         plt.show()
 
 def discrete_implot(arr, change_labels=None, change_colors=None, pixel_scale=10, title = None, return_fig = False):

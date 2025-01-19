@@ -184,7 +184,7 @@ def pca_based_normalization(source_img, reference_img):
 
     # Create an empty array for the normalized source image with the same shape as the source_img
     normalized_img = np.empty_like(source_img)
-    source_img = histogram_matching(source_img, reference_img)
+    # source_img = histogram_matching(source_img, reference_img)
     # Assuming X number of bands, all bands are processed
     for band in range(source_img.shape[-1]):
         src_band = source_img[..., band]
@@ -205,8 +205,8 @@ def pca_based_normalization(source_img, reference_img):
 
         # Use PC1 to perform linear regression between source and reference
         slope, intercept, r_value, p_value, std_err = linregress(pc1[:, 0], joint_data[:, 1])
-
-        print("Band: {}, Slope: {}, Intercept: {}".format(band, slope, intercept))
+# 
+        # print("Band: {}, Slope: {}, Intercept: {}".format(band, slope, intercept))
 
         # Apply the derived slope (gain) and intercept (offset) to normalize the source band
         normalized_data = linear_contrast_enhancement(src_band.ravel() * slope + intercept).astype(source_img.dtype)
@@ -275,7 +275,50 @@ def pca_based_normalization_with_plot(source_img, reference_img):
 
     return normalized_img
 
+def pca_based_normalization_with_points(source_img, reference_img):
+    """
+    Radiometric normalization of a source image based on a reference image using PCA.
+    Returns the normalized source image and an array marking the points used for PCA.
+    """
+    assert source_img.shape == reference_img.shape, "The source and reference images must have the same shape."
+    normalized_img = np.empty_like(source_img)
+    
+    # Create an array to mark points used for PCA
+    points_used_for_pca = np.zeros(source_img.shape[:2], dtype=bool)
+    
+    for band in range(source_img.shape[-1]):
+        src_band = source_img[..., band]
+        ref_band = reference_img[..., band]
 
+        # Mask and remove zeros
+        src_band_non_zero, ref_band_non_zero = remove_zeros_from_pair(src_band, ref_band)
+        
+        # Mark the points used for PCA in the mask
+        mask = (src_band > 0) & (ref_band > 0)
+        if band == 4:
+
+            points_used_for_pca |= mask  # Update mask to include current band's points
+
+        # Create a joint dataset
+        joint_data = np.vstack((src_band_non_zero, ref_band_non_zero)).T
+
+        # Apply PCA on the joint dataset
+        pca = PCA(n_components=1, svd_solver='full')
+        pca.fit(joint_data)
+
+        # Extract first principal component (PC1)
+        pc1 = pca.transform(joint_data)
+
+        # Use PC1 to perform linear regression between source and reference
+        slope, intercept, r_value, p_value, std_err = linregress(pc1[:, 0], joint_data[:, 1])
+
+        print("Band: {}, Slope: {}, Intercept: {}".format(band, slope, intercept))
+
+        # Normalize the source band
+        normalized_data = (src_band.ravel() * slope + intercept).astype(source_img.dtype)
+        normalized_img[..., band] = normalized_data.reshape(src_band.shape)
+
+    return normalized_img, points_used_for_pca
 
 def pca_filter_and_normalize_with_plot(source_img, reference_img, threshold=1.0):
     

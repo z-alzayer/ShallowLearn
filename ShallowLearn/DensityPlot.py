@@ -52,7 +52,7 @@ def density_scatter( x , y, ax, sort = True, bins = 20, **kwargs )   :
 def kde_plot(ax, x, y,  x_scale = None, y_scale = None, cmap='coolwarm'):
     # Create scatter density plot using seaborn
     sns.kdeplot(x=x, y=y, ax=ax, cmap=cmap, fill=True)
-    ax.scatter(x, y, color='gray', alpha=0.1)  # scatter plot overlay
+    # ax.scatter(x, y, color='gray', alpha=0.1)  # scatter plot overlay
     set_limits(ax, x_scale, y_scale)
 
 def hist_2d_plot(ax, x, y,  x_scale = None, y_scale = None, bins=30, cmap=white_viridis):

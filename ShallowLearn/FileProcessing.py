@@ -242,3 +242,16 @@ def order_by_band(files, order = band_mapping.keys()):
             
     # Return only the file paths
     return list(ordered_files.values())
+
+
+def extract_pvi_images(directory):
+    """ Takes a directory and returns all PVI images within directory with their paths"""
+    PVI_Files = list_files_in_dir_recur(directory)
+    PVI = [i for i in PVI_Files if "PVI" in i and i.endswith(".jp2")]
+
+    return PVI 
+
+def extract_MTD_files(directory):
+    files = list_files_in_dir_recur(directory)
+    files = [file for file in files if file.endswith(".xml") and "MTD_MSIL1C" in file]
+    return files

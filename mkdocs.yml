@@ -1,0 +1,70 @@
+site_name: Shallow Learn Documentation
+site_url: https://z-alzayer.github.io/ShallowLearn/
+docs_dir: docs
+theme:
+  name: material
+  palette:
+    scheme: default # or slate for dark-mode
+    primary: light blue
+    accent: custom
+
+  font:
+    text: Roboto
+    code: Roboto Mono
+  
+  logo: assets/logo.png
+  favicon: assets/logo.png
+
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.indexes
+    - content.code.annotate
+    - content.code.copy
+    - content.tooltips
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - abbr
+  - attr_list
+  - pymdownx.snippets
+  - def_list
+  - footnotes
+  - md_in_html
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.keys
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - tables
+
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+
+nav:
+  - Home: index.md
+  - API Reference: api_reference.md
+  - Installation: installation.md
+  - Quick Start: quickstart.md
+

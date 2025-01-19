@@ -5,6 +5,25 @@ import math
 from math import pi
 from skimage.color import rgb2lab, lab2rgb, hsv2rgb
 from ShallowLearn.ImageHelper import plot_lab, plot_hsv, generate_multichannel_mask
+from sklearn.preprocessing import StandardScaler, RobustScaler
+
+def mutliband_standard_scaler(image):
+    original_shape = image.shape
+    img = image.reshape(-1, original_shape[-1])
+    scaler = StandardScaler()
+    rescaled_img = scaler.fit_transform(img)
+    return rescaled_img.reshape(original_shape)
+
+
+def mutliband_robust_scaler(image):
+    original_shape = image.shape
+    img = image.reshape(-1, original_shape[-1])
+    scaler = RobustScaler()
+    rescaled_img = scaler.fit_transform(img)
+    return rescaled_img.reshape(original_shape)
+
+
+
 
 def BCET(image, min_value=0, max_value=255, desired_mean=110):
     """
@@ -63,7 +82,7 @@ def linear_contrast_enhancement(image, max_value=255):
     image[mask_nan] = 0
 
     # Get the minimum value from non-zero elements of the image
-    min_intensity = np.min(image[np.nonzero(image)])
+    min_intensity = np.min(image[np.nonzero(image)]) + 0.001
 
     # Get the maximum value from the image
     max_intensity = np.max(image)
