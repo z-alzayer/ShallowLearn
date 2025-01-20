@@ -4,6 +4,7 @@ import rasterio.mask
 import geopandas as gpd 
 import numpy as np
 from scipy import linalg
+from scipy import stats
 
 def extract_raster_values(shapefile_path, raster_path):
     """
@@ -42,8 +43,6 @@ def extract_raster_values(shapefile_path, raster_path):
     return values
 
 def calculate_depth_invariant_indices(deep_areas, shallow_areas, band_i_idx, band_j_idx):
-    import numpy as np
-    from scipy import stats
     
     # Calculate deep water means
     deep_i = np.concatenate([area[band_i_idx].flatten() for area in deep_areas])
