@@ -7,6 +7,7 @@ from scipy import linalg
 from scipy import stats
 
 def extract_raster_values(shapefile_path, raster_path, bands = None):
+
     """
     Extract raster values using shapefile geometries as masks.
     
@@ -37,13 +38,7 @@ def extract_raster_values(shapefile_path, raster_path, bands = None):
                 mask = rasterio.mask.mask(src, [geometry], crop=True)
             else:
                 mask = rasterio.mask.mask(src[bands,:,:], [geometry], crop=True)
-            # Fix later - hardcoded baseline 4+ value conversion
-            out_image = (mask[0] - 1000) / 10_000
-            
-            # Store masked values
-            values.append(out_image)
-            
-    return values
+            mask = rasterio.mask.mask(src, [geometry], crop=True)
 
 def calculate_depth_invariant_indices(deep_areas, shallow_areas, band_i_idx, band_j_idx):
     ### Works by providing shapes of areas - use other method for mask values
