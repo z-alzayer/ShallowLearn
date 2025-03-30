@@ -3,12 +3,10 @@ channels:
   - conda-forge
 dependencies:
   - python=3.10.8 
-  - gdal=3.8.3
-  - rasterio=1.4.3
-  - libgdal=3.8.3 
-  - geos=3.12.1
-  - proj=9.3.1
-  - matplotlib-base=3.9.0
+  - gdal>3.8.3
+  - rasterio>1.2.8
+  - libgdal>3.6.2 
+  - matplotlib-base=3.10.1
   - scikit-learn=1.6.1
   - scikit-image=0.25.2
   - opencv=4.9.0
