@@ -137,7 +137,7 @@ def apply_mask_l1c(image_path, mask_path):
 
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
     # initial tests on subset of image
     # path_image = "/mnt/sda_mount/L1C/S2A_MSIL1C_20160323T003752_N0201_R059_T55LCD_20160323T003830.SAFE.tiff"
     # path_fmask = '/media/zba21/Expansion/Cloud_Masks/fmask_S2A_MSIL1C_20160323T003752_N0201_R059_T55LCD_20160323T003830.SAFE'
