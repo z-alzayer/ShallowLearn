@@ -39,12 +39,11 @@ jobs:
         python -m coverage run --source ShallowLearn -m pytest
         python -m coverage xml -o coverage.xml
     - name: Upload coverage report
-      uses: actions/upload-artifact@v4
+      uses: codecov/codecov-action@v4.2.1
       with:
-        name: coverage
-        path: coverage.xml
-    - uses: actions/checkout@master
-    - uses: codecov/codecov-action@v4
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
+        token: ${{ secrets.CODECOV_TOKEN }}
         files: coverage.xml
+        verbose: true
+        nonZero: true  # Force CI failure on upload error
+      env:
+        CODECOV_NAME: ${{ github.workflow }}-${{ github.job }}
