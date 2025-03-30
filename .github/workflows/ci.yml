@@ -26,6 +26,7 @@ jobs:
     - name: Install dependencies
       shell: bash
       run: |
+        conda config --add channels defaults
         sudo apt-get update
         pip install -e .
     - name: Run tests
