@@ -1,3 +1,4 @@
+[![codecov](https://codecov.io/github/z-alzayer/ShallowLearn/graph/badge.svg?token=TKUAGXODRB)](https://codecov.io/github/z-alzayer/ShallowLearn)
 # ShallowLearn: Shallow Water Imaging in Python
 
 ## Overview
