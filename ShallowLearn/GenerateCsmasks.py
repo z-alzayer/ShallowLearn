@@ -61,9 +61,9 @@ def save_masked_file(image_path, output_path):
         print("Finished writing file")
 
 
-if __name__ == "__main__":
-    files = fp.list_files_in_dir_recur("/mnt/sda_mount/L1C/")
-    ukis_path = "/mnt/sda_mount/ukis_masks/"
-    for file in files:
-        print(f"{ukis_path}{file.split('/')[-1].split(".tiff")[0]}_csmask.tiff")
-        save_masked_file(file, f"{ukis_path}{file.split('/')[-1].split(".tiff")[0]}_csmask.tiff")
+# if __name__ == "__main__":
+#     files = fp.list_files_in_dir_recur("/mnt/sda_mount/L1C/")
+#     ukis_path = "/mnt/sda_mount/ukis_masks/"
+#     for file in files:
+#         print(f"{ukis_path}{file.split('/')[-1].split(".tiff")[0]}_csmask.tiff")
+#         save_masked_file(file, f"{ukis_path}{file.split('/')[-1].split(".tiff")[0]}_csmask.tiff")
