@@ -39,12 +39,12 @@ jobs:
         python -m coverage run --source ShallowLearn -m pytest
         python -m coverage xml -o coverage.xml
     - name: Upload coverage report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: coverage
         path: coverage.xml
     - uses: actions/checkout@master
-    - uses: codecov/codecov-action@v3
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
         files: coverage.xml
