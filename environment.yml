@@ -15,3 +15,6 @@ dependencies:
   - shapely=2.0.4
   - coverage=7.7.1
   - libtiff=4.6.0 
+  - pandas=2.2.3
+  - geopandas=1.0.1
+  
