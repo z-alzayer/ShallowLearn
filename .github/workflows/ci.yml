@@ -38,12 +38,7 @@ jobs:
         export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
         python -m coverage run --source ShallowLearn -m pytest
         python -m coverage xml -o coverage.xml
-    - name: Upload coverage report
-      uses: codecov/codecov-action@v4.2.1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        files: coverage.xml
-        verbose: true
-        nonZero: true  # Force CI failure on upload error
-      env:
-        CODECOV_NAME: ${{ github.workflow }}-${{ github.job }}
+    - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
