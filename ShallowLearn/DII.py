@@ -78,36 +78,3 @@ def min_max_scaler(arr, scaler = None):
     arr_reshaped = arr.reshape(-1, 1)
     arr_scaled = scaler.fit_transform(arr_reshaped)
     return arr_scaled.reshape(arr.shape) 
-
-if __name__ == "__main__":
-    # Placeholder for loading images
-    images = [np.random.rand(100, 100, 3) for _ in range(2)]  # Example placeholder images
-    
-    for img in images:
-        dii, clusters = process_image(img)
-        # Visualization or further processing
-# Further methods to visualize, extract DII, etc., should be added here.
-
-if __name__ == "__main__":
-    import ShallowLearn.LoadData as load_data
-    import ShallowLearn.LabelLoader as label_loader
-    import ShallowLearn.ImageHelper as ih
-    import numpy as np
-    import matplotlib.pyplot as plt
-    import ShallowLearn.ComputerVisionFeatures as cvf
-    import pandas as pd
-    from ShallowLearn import band_mapping
-
-    # Initialize your seasonal data loader
-    seasonal_loader = load_data.LoadSeasonalData("/mnt/sda_mount/Clipped/L1C/")
-    season = 'Winter'
-    
-    # Load images for the specified season
-    images = seasonal_loader.load_seasonal_images(f"{season}")
-    
-    # Initialize the ImageProcessor
-    for img in images:
-        img = ih.plot_rgb(img)
-        dii, clusters = process_image(img)
-        plt.imshow(min_max_scaler(dii))
-        plt.show()
