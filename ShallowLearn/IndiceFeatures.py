@@ -83,12 +83,3 @@ def get_feature_order():
         or function[0] == 'cl_oci'
        ]
     return functions
-
-    
-
-from ShallowLearn.ImageHelper import load_img
-
-if __name__ == "__main__":
-    path = "/media/ziad/Expansion/Cleaned_Data_Directory/"
-    img = load_img(path + "6880_T55LCD_20220401T003711no_transform.tiff")
-    GenerateIndicesPerImage(img)
