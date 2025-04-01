@@ -238,14 +238,11 @@ class QuickLookPVI(QuickLookModel):
     def __init__(self, files, model = None):
         super().__init__(files, model)
         self.PVI = True
-        if  len(files) <= 1 and os.path.isdir(files):
-            files = fp.extract_pvi_images(files)
-            self.load_zips = False
-            # print(files)
-        elif len(files) > 1 and files[0].endswith(".zip"):
+        if len(files) > 1 and files[0].endswith(".zip"):
             self.load_zips = True
         elif isinstance(files, list):
             print("Starting PCA Model")
+            self.load_zips = False
         else:
             raise ValueError("Need to add a path or a list of files to use method")
         components = 4
@@ -264,6 +261,7 @@ class QuickLookPVI(QuickLookModel):
             for file in self.files:
                 with Image.open(file) as im:
                     imagery.append(np.array(im))
+                    files.append(file)
         else:
             for file in self.files:
                 try:
