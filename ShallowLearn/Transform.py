@@ -155,7 +155,7 @@ def rgb_to_hsi(rgb):
     num = 0.5 * ((r - g) + (r - b))
     den = np.sqrt((r - g) ** 2 + (r - b) * (g - b))
     den = np.where(np.isnan(den), 0.00001, den) # handle NaN
-    theta = np.arccos(num / den)
+    theta = np.arccos(num + 0.0001 / den + 0.0001)
 
     H = theta.copy()
     H[b > g] = 2 * np.pi - H[b > g]
