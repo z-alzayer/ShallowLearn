@@ -39,7 +39,7 @@ def plot_images_with_info(all_images, band_order = [0,1,2]):
     plt.show()
 
 
-def plot_images_on_scatter(transformed_data, imagery, image_fraction=0.11, title = "Images on scatter"):
+def plot_images_on_scatter(transformed_data, imagery, image_fraction=0.11, title = "Images on scatter", bands = (0,1,2)):
     """
     Plots images on a scatter plot at specified coordinates.
 
@@ -56,7 +56,7 @@ def plot_images_on_scatter(transformed_data, imagery, image_fraction=0.11, title
         if imagery[i].shape[-1] == 1:
             image_data = imagery[i][:,:,:]
         else:
-            image_data = imagery[i][:,:,[0,1,2]]
+            image_data = imagery[i][:,:,[bands[0],bands[1],bands[2]]]
         # Get the corresponding scatter point
         x, y = transformed_data[i, 0], transformed_data[i, 1]
 
