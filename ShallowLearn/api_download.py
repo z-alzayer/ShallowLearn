@@ -1,4 +1,4 @@
-from landsatxplore.api import API
+# from landsatxplore.api import API
 import abc
 from datetime import date
 import os

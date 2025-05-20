@@ -70,7 +70,7 @@ def cloud_regressor(img, return_mask = False, threshold = 500,
 
                 
     mask = np.expand_dims(model.predict(img).reshape(shape[:2]), axis = 2)
-    print("Generating cloud mask complete.")
+    # print("Generating cloud mask complete.")
     # import matplotlib.pyplot as plt
     # plt.imshow(mask)
     # plt.show()

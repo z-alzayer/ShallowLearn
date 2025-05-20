@@ -89,6 +89,58 @@ def generate_query(tile):
     features =  features_current + features_intermediate_1 + features_intermediate_2 + features_historical
     return features
 
+def generate_query_from_bbox(bbox):
+    search_terms_current = {
+        "startDate": "2012-01-23",
+        "completionDate": "2024-12-31",
+        "processingLevel": "S2MSI1C",
+        "processingBaseline": "05.11",
+        "geometry": bbox,
+        # "tileId": tile
+    }
+
+    # Intermediate data (Processing Baseline 05.10)
+    search_terms_intermediate = {
+        "startDate": "2022-01-13",
+        "completionDate": "2025-01-27",
+        "processingLevel": "S2MSI1C",
+        "processingBaseline": "05.10",
+        "geometry": bbox,
+        # "tileId": tile
+    }
+
+    # Historical data 2022-2023 (Processing Baseline 05.09)
+    search_terms_historical = {
+        "startDate": "2022-04-29",
+        "completionDate": "2024-03-13",
+        "processingLevel": "S2MSI1C",
+        "processingBaseline": "05.09",
+        "geometry": bbox,
+        # "tileId": tile
+    }
+
+    # Earlier historical data (Processing Baseline 05.00)
+    search_terms_historical_prior = {
+        "startDate": "2015-01-31",
+        "completionDate": "2022-04-28",
+        "processingLevel": "S2MSI1C",
+        "processingBaseline": "05.00",
+        "geometry": bbox,
+        # "tileId": tile
+    }
+
+
+
+    # Query all features and combine results
+    features_current = list(query_features("Sentinel2", search_terms_current))
+    features_intermediate_1 = list(query_features("Sentinel2", search_terms_intermediate))
+    features_intermediate_2 = list(query_features("Sentinel2", search_terms_historical))
+    features_historical = list(query_features("Sentinel2", search_terms_historical_prior))
+
+    # Combine all features
+    features =  features_current + features_intermediate_1 + features_intermediate_2 + features_historical
+    return features
+
 def filter_features_by_size(features, min_size=None, max_size=None):
     """
     Filter features based on file size in bytes.

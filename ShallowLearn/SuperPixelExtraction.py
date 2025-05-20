@@ -6,6 +6,7 @@ from sklearn.decomposition import PCA, KernelPCA, FastICA, LatentDirichletAlloca
 from fast_slic.avx2 import SlicAvx2
 import ShallowLearn.ImageHelper as ih
 import matplotlib.pyplot as plt 
+from sklearn.cluster import OPTICS, DBSCAN
 
 def felzenszwalb_segmentation(image, scale=100, sigma=0.5, min_size=50):
     segments_fz = felzenszwalb(image, scale=scale, sigma=sigma, min_size=min_size)
@@ -34,7 +35,7 @@ def multiotsu_thresholding(image, classes=3):
     thresholds = threshold_multiotsu(image, classes=classes)
     return thresholds
 
-def pad_slice_segments(image, segments, shape = (32, 32, 13)):
+def pad_slice_segments(image, segments, shape = (32, 32, 3)):
     patches = []
     for i in np.unique(segments):
         segment = segments == i
@@ -45,30 +46,48 @@ def pad_slice_segments(image, segments, shape = (32, 32, 13)):
         patches.append(resized_patch)
     return np.array(patches) 
 
+def pad_slice_segments_w_0pads(image, segments, shape=(32, 32, 13)):
+    patches = []
+    for i in np.unique(segments):
+        segment = segments == i
+        patch = image[segment]
+        
+        # Calculate padding needed
+        pad_size = shape[0] - len(patch)
+        if pad_size > 0:
+            # Create zero padding
+            padding = np.zeros((pad_size,) + patch.shape[1:])
+            # Concatenate original patch with padding
+            padded_patch = np.concatenate([patch, padding], axis=0)
+            patches.append(padded_patch)
+        else:
+            # If patch is larger than desired shape, resize it
+            resized_patch = resize(patch, shape, preserve_range=True)
+            patches.append(resized_patch)
+            
+    return np.array(patches)
 
-def pca_segments(patches, n_components=2):
+def pca_segments(patches, n_components=4):
     # pca = LatentDirichletAllocation(n_components=n_components)
-    pca = KernelPCA(n_components=n_components)
+    pca = PCA(n_components=n_components)
     patches = patches.reshape(patches.shape[0], -1)
     pca.fit(patches)
     pca_image = pca.transform(patches)
     return pca_image
 
-def optics_labels(image, segments, min_samples=100):
-    from sklearn.cluster import OPTICS
+def optics_labels(image, segments, min_samples=10):
     patches = pad_slice_segments(image, segments)
     pca_image = pca_segments(patches)
-    # plt.scatter(pca_image[:,0], pca_image[:,1])
-    # plt.show()
-    db = OPTICS(min_samples=min_samples).fit(pca_image)
+    db = DBSCAN(eps = 10,min_samples=min_samples).fit(pca_image)
     return db.labels_
 
 
-def generate_sup_pixel_labels(image):
-    segments = slic_segmentation(image, n_segments = max(image.shape))
+def generate_sup_pixel_labels(image, no_segments = None):
+    if no_segments is None:
+        no_segments = max(image.shape) / 10
+    segments = slic_segmentation(image, n_segments = no_segments)
     labels = optics_labels(image, segments)
     super_pixel = np.zeros(segments.shape)
-    
     for index, i in enumerate(np.unique(segments)):
         super_pixel[segments == i] = labels[index]
     return super_pixel
@@ -77,8 +96,8 @@ def generate_sup_pixel_labels(image):
 def gen_dii(image):
     super_pixel = generate_sup_pixel_labels(image)
     print(np.unique(super_pixel))
-    mean_1 = np.mean(ih.apply_mask(image, np.expand_dims(super_pixel == 1, axis = 2))[:,:,3])
-    mean_2 = np.mean(ih.apply_mask(image, np.expand_dims(super_pixel == 0, axis = 2))[:,:,3])
+    mean_1 = np.mean(ih.apply_mask(image, np.expand_dims(super_pixel == 1, axis = 2))[:,:,-1])
+    mean_2 = np.mean(ih.apply_mask(image, np.expand_dims(super_pixel == 0, axis = 2))[:,:,-1])
     if mean_1 < mean_2:
         mask_shallow = super_pixel == 0
         mask_deep = super_pixel == 1
@@ -87,7 +106,7 @@ def gen_dii(image):
         mask_deep = super_pixel == 0
     dii_results = np.empty_like(image, dtype=np.float32)
 
-    for band in range(13):
+    for band in range(image.shape[-1]):
         # Extract band data
         band_data = image[:,:,band]
         

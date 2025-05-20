@@ -39,7 +39,7 @@ def plot_images_with_info(all_images, band_order = [0,1,2]):
     plt.show()
 
 
-def plot_images_on_scatter(transformed_data, imagery, image_fraction=0.11, title = "Images on scatter", bands = (0,1,2)):
+def plot_images_on_scatter(transformed_data, imagery, image_fraction=0.11, title = "Images on scatter", dims = (0, 1), bands = (0,1,2), labels = None):
     """
     Plots images on a scatter plot at specified coordinates.
 
@@ -49,8 +49,10 @@ def plot_images_on_scatter(transformed_data, imagery, image_fraction=0.11, title
     - image_fraction: float, the fraction of the plot range to determine the size of the images.
     """
     fig, ax = plt.subplots(figsize=(20, 10))
-    ax.scatter(transformed_data[:, 0], transformed_data[:, 1])
-
+    if labels is None:
+        ax.scatter(transformed_data[:, dims[0]], transformed_data[:, dims[1]])
+    else:
+        ax.scatter(transformed_data[:, dims[0]], transformed_data[:, dims[1]], c = labels)
     for i in range(len(imagery)):
         # Load and process the image
         if imagery[i].shape[-1] == 1:
@@ -58,7 +60,7 @@ def plot_images_on_scatter(transformed_data, imagery, image_fraction=0.11, title
         else:
             image_data = imagery[i][:,:,[bands[0],bands[1],bands[2]]]
         # Get the corresponding scatter point
-        x, y = transformed_data[i, 0], transformed_data[i, 1]
+        x, y = transformed_data[i, dims[0]], transformed_data[i, dims[1]]
 
         # Create an OffsetImage and AnnotationBbox
         imagebox = OffsetImage(image_data, zoom=image_fraction)
@@ -235,6 +237,12 @@ def plot_quality_over_time_side_by_side(df):
     # Enhancing the overall aesthetics
     plt.tight_layout(pad=3.0)  # Adjust layout to make room for label
     plt.show()
+    
+def standardize_axes(ax):
+    ax.set_aspect('auto')  # Remove aspect ratio constraints
+    # ax.tick_params(labelsize=12)  # Consistent font sizes
+    ax.tick_params(axis='both', labelsize=16) 
+    # Add other universal formatting here
 
 def clip_image(image, clip_percent=1):
     """
@@ -277,3 +285,31 @@ def extract_point_spectra(array, x, y):
     
     spectra = array[:, x, y, :]
     return spectra
+
+def get_bbox_from_coordinates(coord_dict):
+    """
+    Convert GeoJSON-like coordinates to a bounding box format
+    
+    Args:
+        coord_dict (dict): Dictionary containing 'type' and 'coordinates' keys
+        
+    Returns:
+        tuple: (min_x, max_y, max_x, min_y) representing the bounding box
+    """
+    if coord_dict['type'] != 'Polygon':
+        raise ValueError("Only Polygon type is supported")
+        
+    # Extract coordinates from the first ring (exterior)
+    coords = coord_dict['coordinates'][0]
+    
+    # Get all x and y coordinates
+    x_coords = [point[0] for point in coords]
+    y_coords = [point[1] for point in coords]
+    
+    # Calculate bounding box
+    min_x = min(x_coords)
+    max_x = max(x_coords)
+    min_y = min(y_coords)
+    max_y = max(y_coords)
+    
+    return min_x, max_y, max_x, min_y

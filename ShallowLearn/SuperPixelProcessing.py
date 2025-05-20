@@ -137,17 +137,23 @@ def plot_results(dii_results, img_rescale, img, image_path):
     print(f"Finished processing: {fname_substring}")
     plt.show()
 
-def create_and_pad_superpixels_v2(img, shape = (32, 32, 13)):
-    lab_image = rgb2lab(img[:,:,[3,2,1]] / 10_000) # revert 10_000 later
-    super_px = spe.slic_segmentation(lab_image, n_segments = int(img.shape[0]/2), faster_slic=False)
-    padded_segments = spe.pad_slice_segments(img, super_px, shape = shape)
+def create_and_pad_superpixels_v2(img, bands = [3,2,1], n_segments = None, shape = (32, 32, 13), 
+                                  resize_method = None, correction_factor = 10_000):
+    lab_image = rgb2lab(img[:,:,bands] / correction_factor)
+    if n_segments is None:
+        n_segments = int(img.shape[0]/2)
+    super_px = spe.slic_segmentation(lab_image, n_segments = n_segments, faster_slic=False)
+    if resize_method is None:
+        padded_segments = spe.pad_slice_segments_w_0pads(img, super_px, shape = shape)
+    else:
+        padded_segments, super_px = create_and_pad_super_pixels(img)
     return padded_segments, super_px
 
-def create_and_pad_super_pixels(img):
+def create_and_pad_super_pixels(img, pad_shape = (32,32,13)):
     start_time = time.time()
     lab_image = ih.plot_lab(img).astype(np.uint8)
     super_pixel = spe.slic_segmentation(lab_image, n_segments=int(img.shape[0] / 2))
-    padded_segment = spe.pad_slice_segments(img, super_pixel)
+    padded_segment = spe.pad_slice_segments(img, super_pixel, shape = pad_shape)
     end_time = time.time()
     print(f"Processing time: {end_time - start_time} seconds")
     return padded_segment, super_pixel
