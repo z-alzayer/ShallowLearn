@@ -506,4 +506,4 @@ class QuickLookArea(QuickLookModel):
             labels = clust.fit_predict(self.transformed_data)
             self.df['Label'] = labels
             return self.df['Label']
-         
+        

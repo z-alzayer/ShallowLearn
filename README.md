@@ -1,7 +1,39 @@
-# ShallowLearn: Shallow Water Imaging in Python
+[![codecov](https://codecov.io/github/z-alzayer/ShallowLearn/graph/badge.svg?token=TKUAGXODRB)](https://codecov.io/github/z-alzayer/ShallowLearn)
 
-## Overview
+# ShallowLearn: A Python Toolkit for Shallow Water Remote Sensing Analysis
 
-ShallowLearn is a Python package for processing and analyzing imagery data of shallow water environments. This package is designed to provide an efficient and effective way to calculate common indices used in marine and environmental science, as well as having a basic toolbox for datascience applications for Shallow Water Imaging.
+ShallowLearn provides a collection of tools and utilities designed for processing, analyzing, and visualizing satellite imagery, with a particular focus on shallow water environments like coral reefs. It includes functionalities for data loading, preprocessing, feature extraction, segmentation, time-series analysis, and visualization. This repo is a work in progress with improvements to come, I'm still in the process of refactoring now that the paper is published but hopefully I'll get to it sooner rather than later.
 
-Revision of the repo is still in progress so whilst the main ideas will not change, there maybe some refactoring and reorganisation in the long term to clarify certain parts of the code. For now this is a very alpha stage release. The documentation for the code exists in the github pages and most things should be working but expect bugs and unclear error messages in its current state. [Documentation is available here](https://z-alzayer.github.io/ShallowLearn/)
+## Features
+
+*   **Data Handling:**
+    *   Load satellite data from various formats (GeoTIFF, Sentinel-2 SAFE/ZIP).
+    *   Download Sentinel-2 via APIs (`cdsetool`).
+    *   Compile multi-band GeoTIFFs from raw Sentinel-2 bands.
+    *   Handle time series and seasonal data loading.
+*   **Image Processing:**
+    *   Radiometric normalization (PCA-based, Histogram Matching).
+    *   Image transformations (Contrast Enhancement - LCE, BCET, Color Space Conversions - LAB, HSV).
+    *   Cloud detection and masking (XGBoost-based).
+    *   Image resampling operations.
+*   **Feature Extraction:**
+    *   Calculate standard remote sensing indices.
+    *   Extract computer vision features (LBP, Gabor, HOG, Edge Density).
+    *   Generate comprehensive feature stacks combining spectral, index, and texture information.
+*   **Segmentation:**
+    *   Superpixel generation using various algorithms (SLIC, Felzenszwalb, Quickshift, Watershed).
+    *   Superpixel processing pipelines involving PCA and clustering (DBSCAN, OPTICS, GMM).
+*   **Depth Invariant Indices (DII):**
+    *   Calculate standard band-ratio DII.
+    *   Implement superpixel-based DII workflows for automated deep/shallow area identification.
+*   **Time Series Analysis:**
+    *   Process and normalize image time series.
+    *   Quick-look analysis using PCA and clustering on image thumbnails or cropped areas.
+*   **Utilities & Visualization:**
+    *   Helper functions for date extraction, band mapping, and metadata handling.
+    *   Plotting utilities for images, spectra, histograms, scatter plots with image overlays, and density plots.
+
+
+[Documentation is available here](https://z-alzayer.github.io/ShallowLearn/)
+
+If you've found any of the code useful please cite our [paper](https://www.mdpi.com/2072-4292/17/7/1244) 
