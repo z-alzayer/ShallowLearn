@@ -6,7 +6,8 @@ import numpy as np
 from scipy import linalg
 from scipy import stats
 
-def extract_raster_values(shapefile_path, raster_path):
+def extract_raster_values(shapefile_path, raster_path, bands = None):
+
     """
     Extract raster values using shapefile geometries as masks.
     
@@ -33,20 +34,19 @@ def extract_raster_values(shapefile_path, raster_path):
         # Extract values for each geometry
         for geometry in shapes.geometry:
             # Create mask from geometry
+            if bands is None:
+                mask = rasterio.mask.mask(src, [geometry], crop=True)
+            else:
+                mask = rasterio.mask.mask(src[bands,:,:], [geometry], crop=True)
             mask = rasterio.mask.mask(src, [geometry], crop=True)
-            # Fix later - hardcoded baseline 4+ value conversion
-            out_image = (mask[0] - 1000) / 10_000
-            
-            # Store masked values
-            values.append(out_image)
-            
-    return values
 
 def calculate_depth_invariant_indices(deep_areas, shallow_areas, band_i_idx, band_j_idx):
-    
+    ### Works by providing shapes of areas - use other method for mask values
+
     # Calculate deep water means
     deep_i = np.concatenate([area[band_i_idx].flatten() for area in deep_areas])
     deep_j = np.concatenate([area[band_j_idx].flatten() for area in deep_areas])
+
     Ls_i = np.nanmean(deep_i)
     Ls_j = np.nanmean(deep_j)
     
@@ -66,6 +66,26 @@ def calculate_depth_invariant_indices(deep_areas, shallow_areas, band_i_idx, ban
     slope, _ = stats.linregress(Xi, Xj)[:2]
     
     return slope, (Ls_i, Ls_j)
+
+def calculate_slope_from_values(deep_i, deep_j, shallow_i, shallow_j):
+
+    Ls_i = np.nanmean(deep_i)
+    Ls_j = np.nanmean(deep_j)
+    
+    
+    # Apply minimum difference threshold of 0.01
+    dif_i = np.maximum(shallow_i - Ls_i, 0.01)
+    dif_j = np.maximum(shallow_j - Ls_j, 0.01)
+    
+    # Transform to log space
+    Xi = np.log(dif_i)
+    Xj = np.log(dif_j)
+    
+    # Calculate perpendicular regression slope
+    slope, _ = stats.linregress(Xi, Xj)[:2]
+    
+    return slope, (Ls_i, Ls_j)
+
 
 def apply_depth_invariant_index(image_i, image_j, ki_kj, Ls):
     """

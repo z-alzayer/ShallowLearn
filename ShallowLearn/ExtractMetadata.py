@@ -1,10 +1,83 @@
 import pandas as pd
 import re
+import requests
+import os
 
 import ShallowLearn.LoadData as ld
 import ShallowLearn.FileProcessing as fp
 import ShallowLearn.Util as utilities
 import ShallowLearn.QuickLook as quicklook
+
+
+def map_and_filter_columns(df):
+    # Dictionary mapping between the two column sets
+    df.columns = [i.upper() for i in df.columns]
+    column_mapping = {
+        'ID': 'DATATAKE_1_ID',
+        'TITLE':"COMMON_COMPONENT",
+        'STARTDATE': 'DATATAKE_1_DATATAKE_SENSING_START',
+        'COMPLETIONDATE': 'PRODUCT_STOP_TIME',
+        'PRODUCTTYPE': 'PRODUCT_TYPE',
+        'PROCESSINGLEVEL': 'PROCESSING_LEVEL',
+        'PLATFORM': 'DATATAKE_1_SPACECRAFT_NAME',
+        'CLOUDCOVER': 'CLOUD_COVERAGE_ASSESSMENT',
+        'THUMBNAIL_URL': 'PREVIEW_IMAGE_URL'
+    }
+    
+    # Create a new dataframe with only the mapped columns
+    mapped_columns = {old_col: new_col for old_col, new_col in column_mapping.items() 
+                     if old_col in df.columns}
+    
+    if not mapped_columns:
+        return None
+    
+    # Create new dataframe with renamed columns
+    result_df = df[list(mapped_columns.keys())].copy()
+    result_df = result_df.rename(columns=mapped_columns)
+    
+    return result_df
+
+def download_thumbnails_helper(thumbnail_url, title, thumbnail_dir):
+        response = requests.get(thumbnail_url)
+        if response.status_code == 200:
+            image_path = os.path.join(thumbnail_dir, f"{title}.jpg")
+            if os.path.exists(image_path):
+                return f"{title}.jpg already downloaded"
+            with open(image_path, 'wb') as file:
+                file.write(response.content)
+            print(f"Downloaded thumbnail for feature {title}")
+        else:
+            print(f"Failed to download thumbnail for feature {title}")
+        return f"{title}.jpg"
+
+def generate_api_df(features, thumbnail_dir, download_thumbnails = True):
+    data = []
+    for feature in features:
+        thumbnail_url = feature['properties'].get('thumbnail')
+        title = feature['properties'].get('title')
+        properties = feature['properties']
+        data.append({
+            'id': feature['id'],
+            'title': properties.get('title'),
+            'startDate': properties.get('startDate'),
+            'completionDate': properties.get('completionDate'),
+            'productType': properties.get('productType'),
+            'processingLevel': properties.get('processingLevel'),
+            'platform': properties.get('platform'),
+            'instrument': properties.get('instrument'),
+            'cloudCover': properties.get('cloudCover'),
+            'geometry': feature['geometry'],
+            'thumbnail_url': properties.get('thumbnail'),
+            'download_url': properties.get('services', {}).get('download', {}).get('url'),
+            'size': properties.get('services', {}).get('download', {}).get('size', 0)
+        })
+        if (thumbnail_url and title) and download_thumbnails:
+            download_thumbnails_helper(thumbnail_url, title, thumbnail_dir)
+    df = pd.DataFrame(data)
+
+    
+    return df
+
 
 
 def generate_metadata_dataframe(directory, gen_from_zips = False):

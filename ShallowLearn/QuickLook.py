@@ -8,20 +8,23 @@ from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import matplotlib.dates as mdates
 from PIL import Image
 from sklearn.decomposition import PCA, KernelPCA
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import DBSCAN, OPTICS, cluster_optics_dbscan
 from tqdm import tqdm
-
+import random
 
 import ShallowLearn.FileProcessing as fp
 from ShallowLearn.LoadData import LoadSentinel2L1C as load_sen2, PVI_Dataloader
+from ShallowLearn.LoadData import OptimizedLoadSentinel2L1C as optimized_sen2
 import ShallowLearn.ExtractMetadata as extract_meta
 from ShallowLearn.band_mapping import band_mapping
 from ShallowLearn.Util import clip_image
 import ShallowLearn.Transform as trf
+from ShallowLearn.API_Utils import filter_by_indices, filter_by_label
 
 from skimage.transform import resize
 from sklearn.mixture import GaussianMixture
 from scipy.interpolate import griddata
+from sklearn.preprocessing import RobustScaler
 
 def plot_images_on_pca(transformed_data, original_images, zoom=0.1, figsize=(10, 10), title = "Visualization of Transformed Imagery"):
     """
@@ -67,6 +70,8 @@ class QuickLookModel():
         self.imagery = []
         self.pca_model = PCA()
 
+    def __len__(self):
+        return len(self.imagery)
 
     def create_custom_pastel_cmap(self, labels):
         """
@@ -90,26 +95,49 @@ class QuickLookModel():
         transformed_data = self.pca_model.fit_transform(transformed_imagery)
         return transformed_data
 
-    def predict(self, transformed_data, model = None):
+    def predict(self, transformed_data, model = None, eps=50, min_samples=5):
         if model is None:
-            dbscan_model = DBSCAN(eps=30, min_samples=9)
+            dbscan_model = DBSCAN(eps=eps, min_samples=min_samples)
             dbscan_model.fit(transformed_data)
             return dbscan_model.labels_ 
-    
+
     def generate_dataframe(self):
         raise Exception("Not implemented in baseclass")
 
 
-    def plot_cloud_coverage(self, df, zoom = 0.05):
-        if self.PVI:
-            custom_cmap = ListedColormap(['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'])  # Four distinct colors
-        else:
-            label_list = (df.Label.unique())
-            custom_cmap = self.create_custom_pastel_cmap(label_list)
-        df['DATATAKE_1_DATATAKE_SENSING_START'] = pd.to_datetime(df['DATATAKE_1_DATATAKE_SENSING_START'], errors='coerce')
+    def plot_cloud_coverage(self, df, class_dict, zoom=0.05, save=None, 
+                        show_images=True, cloud_threshold=50, percentage_show = 75,
+                        ax = None, title=None):
+        """
+        Parameters:
+        -----------
+        class_dict: dict
+            Dictionary mapping class numbers to (color, label) tuples
+            e.g., {-1: ('#1f77b4', 'Clear Sky'), 
+                    0: ('#ff7f0e', 'Partially Cloudy'),
+                    1: ('#2ca02c', 'Cloudy')}
+        """
+        # Filter data based on cloud coverage
+        valid_indices = df['CLOUD_COVERAGE_ASSESSMENT'] <= cloud_threshold
+        filtered_df = df[valid_indices].copy()
+        filtered_imagery = [self.imagery[i] for i in range(len(self.imagery)) if valid_indices.iloc[i]]
 
-        # Plotting
-        fig, ax = plt.subplots(figsize=(12, 6))
+        # Create color map from dictionary
+        label_list = sorted(filtered_df.Label.unique())  # Sort labels for consistency
+        colors = [class_dict[label][0] for label in label_list]
+        custom_cmap = ListedColormap(colors)
+
+        # Convert datetime column
+        filtered_df['DATATAKE_1_DATATAKE_SENSING_START'] = pd.to_datetime(
+            filtered_df['DATATAKE_1_DATATAKE_SENSING_START'], 
+            errors='coerce'
+        )
+
+        if ax is None:
+            show = True
+            fig, ax = plt.subplots(figsize=(15, 15))
+        else:
+            show = False
 
         # Formatting date on x-axis
         ax.xaxis.set_major_locator(mdates.YearLocator())
@@ -117,122 +145,166 @@ class QuickLookModel():
         ax.xaxis.set_minor_formatter(mdates.DateFormatter('%b'))
 
         # Adding labels and title
-        ax.set_xlabel('Sensing Start Date', fontsize=14)
-        ax.set_ylabel('Cloud Coverage Assessment', fontsize=14)
-        ax.set_title('Cloud Coverage Assessment over Time', fontsize=16)
+        ax.set_xlabel('Sensing Start Date', fontsize=30)
+        ax.set_ylabel('Cloud Coverage Assessment', fontsize=30)
+        if title is None:
+            ax.set_title(f'Cloud Coverage Assessment over Time (Cloud Coverage ≤ {cloud_threshold}%)', 
+                        fontsize=30)
+        else:
+            ax.set_title(f'{title}', 
+            fontsize=30) 
 
         # Adding a grid
         ax.grid(True, which='both', linestyle='--', linewidth=0.5)
 
-        # Adding images on the plot with a border corresponding to the label color
-        for x, y, img, label in zip(df['DATATAKE_1_DATATAKE_SENSING_START'], df['CLOUD_COVERAGE_ASSESSMENT'], self.imagery, df['Label']):
-            if self.PVI == False:
-                img = img[:,:,[2,1,0]]
-            imagebox = OffsetImage(img, zoom=zoom, alpha=0.783)  # Adjust the zoom parameter and alpha for transparency
-            ab = AnnotationBbox(imagebox, (mdates.date2num(x), y),
+        if show_images:
+            # Adding images on the plot with a border corresponding to the label color
+            for x, y, img, label in zip(filtered_df['DATATAKE_1_DATATAKE_SENSING_START'], 
+                                    filtered_df['CLOUD_COVERAGE_ASSESSMENT'], 
+                                    filtered_imagery, 
+                                    filtered_df['Label']):
+                if not self.PVI:
+                    img = img[:,:,[2,1,0]]
+                num = random.randint(0,100)
+                if num < percentage_show:
+                    continue
+                imagebox = OffsetImage(img, zoom=zoom, alpha=0.783)
+                label_idx = label_list.index(label)  # Get index of label in sorted list
+                ab = AnnotationBbox(imagebox, (mdates.date2num(x), y),
                                 frameon=True,
-                                bboxprops=dict(edgecolor=custom_cmap(label+1), linewidth=2))  # Offset label by 1 to handle -1
-            ax.add_artist(ab)
+                                bboxprops=dict(edgecolor=custom_cmap(label_idx), linewidth=2))
+                ax.add_artist(ab)
 
-        # Scatter plot with discrete colors on top of the images
-        scatter = ax.scatter(df['DATATAKE_1_DATATAKE_SENSING_START'], df['CLOUD_COVERAGE_ASSESSMENT'], 
-                             c=df['Label'], cmap=custom_cmap, edgecolor='black', linewidth=1, s=50)
+        # Scatter plot with discrete colors
+        scatter = ax.scatter(filtered_df['DATATAKE_1_DATATAKE_SENSING_START'], 
+                            filtered_df['CLOUD_COVERAGE_ASSESSMENT'],
+                            c=[label_list.index(label) for label in filtered_df['Label']], 
+                            cmap=custom_cmap, 
+                            edgecolor='black', 
+                            linewidth=1, 
+                            s=50)
 
-        # Adding a color bar with discrete labels
-        cbar = plt.colorbar(scatter, ax=ax, ticks=np.arange(-1, 3))
-        cbar.set_label('Label', fontsize=12)
-        if self.PVI:
-            cbar.set_ticks([-1, 0, 1, 2])  # Ensure all four labels are present
-            cbar.set_ticklabels(['Partially Cloudy', 'Clear Sky', 'Opaque Clouds', 'No Data'])  # Custom labels for classes
+        # Adding a color bar with labels
+        cbar = plt.colorbar(scatter, ax=ax, ticks=range(len(label_list)),fraction=0.046, pad=0.04)
+        cbar.set_label('Class Label', fontsize=30)
+        cbar.set_ticklabels([class_dict[label][1] for label in label_list])
+        ax.tick_params(axis='both', labelsize=25)  # Changes both x and y axis numbers
 
-        # Improving the overall appearance
-        plt.tight_layout()
+        # plt.tight_layout()
+        if save is not None:
+            plt.savefig(save)
+        if show:
+            plt.show()
 
-        # Show plot
-        plt.show()
+
         
-    def plot_principal_components(self, df, plot_meshgrid=True, zoom = 0.05):
-        if self.PVI:
-            custom_cmap = ListedColormap(['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'])  # Four distinct colors
-            num = 1
-        else:
-            label_list = (df.Label.unique())
-            custom_cmap = self.create_custom_pastel_cmap(label_list)
-            num = 0
-        background_cmap = plt.cm.viridis  # Warm and cool colormap
+    def plot_principal_components(self, df, class_dict, plot_meshgrid=True, 
+                                zoom=0.05, save=None, show_images=True, cloud_threshold=50,
+                                percentage_show = 75, ax = None, title = None, axis_extent = 10_000):
+        """
+        Parameters:
+        -----------
+        class_dict: dict
+            Dictionary mapping class numbers to (color, label) tuples
+            e.g., {-1: ('#1f77b4', 'Clear Sky'), 
+                    0: ('#ff7f0e', 'Partially Cloudy'),
+                    1: ('#2ca02c', 'Cloudy')}
+        """
+        # First perform PCA on all imagery for the mesh
+        full_pca_result = self.pca_model.transform([img.flatten() for img in self.imagery])
+        
+        # Then filter data based on cloud coverage
+        valid_indices = df['CLOUD_COVERAGE_ASSESSMENT'] <= cloud_threshold
+        filtered_df = df[valid_indices].copy()
+        filtered_imagery = [self.imagery[i] for i in range(len(self.imagery)) if valid_indices.iloc[i]]
+        filtered_pca = full_pca_result[valid_indices]
 
-        # Perform PCA on the imagery data
-        pca_result = self.pca_model.transform([img.flatten() for img in self.imagery])
+        # Create color map from dictionary
+        label_list = sorted(filtered_df.Label.unique())  # Sort labels for consistency
+        colors = [class_dict[label][0] for label in label_list]
+        custom_cmap = ListedColormap(colors)
+        
+        background_cmap = plt.cm.viridis
 
         # Plotting
-        fig, ax = plt.subplots(figsize=(15, 15))
+        if ax is None:
+            show = True
+            fig, ax = plt.subplots(figsize=(15, 15))
+        else:
+            show = False
 
         if plot_meshgrid:
-            # Create a meshgrid for the background
-            x_min, x_max = pca_result[:, 0].min() - 1, pca_result[:, 0].max() + 1
-            y_min, y_max = pca_result[:, 1].min() - 1, pca_result[:, 1].max() + 1
+            # Use full dataset for mesh boundaries
+            x_min, x_max = full_pca_result[:, 0].min() - axis_extent, full_pca_result[:, 0].max() + axis_extent
+            y_min, y_max = full_pca_result[:, 1].min() - axis_extent, full_pca_result[:, 1].max() + axis_extent
             xx, yy = np.meshgrid(np.linspace(x_min, x_max, 100), np.linspace(y_min, y_max, 100))
 
-            # Flatten the meshgrid arrays and create a PCA input format
             grid_points = np.c_[xx.ravel(), yy.ravel()]
-
-            # Create a dummy array with the correct number of components
             dummy_points = np.zeros((grid_points.shape[0], self.pca_model.n_components_))
             dummy_points[:, :2] = grid_points
 
-            # Inverse transform to the original space
-            inverse_transformed_points = self.pca_model.inverse_transform(dummy_points)
+            # inverse_transformed_points = self.pca_model.inverse_transform(dummy_points)
+            cloud_coverage_grid = griddata(full_pca_result[:, :2], 
+                                        df['CLOUD_COVERAGE_ASSESSMENT'], 
+                                        (xx, yy), 
+                                        method='linear')
 
-            # Predict or interpolate the cloud coverage for the grid points
-            cloud_coverage_grid = griddata(pca_result[:, :2], df['CLOUD_COVERAGE_ASSESSMENT'], (xx, yy), method='linear')
+            c = ax.imshow(cloud_coverage_grid, 
+                        extent=(x_min, x_max, y_min, y_max), 
+                        origin='lower', 
+                        cmap=background_cmap, 
+                        alpha=0.5)
 
-            # Plot the background meshgrid
-            c = ax.imshow(cloud_coverage_grid, extent=(x_min, x_max, y_min, y_max), origin='lower', cmap=background_cmap, alpha=0.5)
+            cbar_bg = plt.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
+            cbar_bg.set_label('Cloud Coverage Assessment', fontsize=30)
+            cbar_bg.ax.tick_params(labelsize=25)  # Adjust 20 to your desired font size
 
-            # Adding a color bar for the background
-            cbar_bg = plt.colorbar(c, ax=ax, fraction=0.01, pad = 0.1)
-            cbar_bg.set_label('Cloud Coverage Assessment', fontsize=12)
-
-        # Adding labels and title
-        ax.set_xlabel('Principal Component 1', fontsize=14)
-        ax.set_ylabel('Principal Component 2', fontsize=14)
-        ax.set_title('Principal Component Analysis of Imagery with Cloud Coverage', fontsize=16)
-
-        # Adding a grid
+        ax.set_xlabel('Principal Component 1', fontsize=30)
+        ax.set_ylabel('Principal Component 2', fontsize=30)
+        if title is None:
+            ax.set_title(f'Principal Component Analysis of Imagery (Cloud Coverage ≤ {cloud_threshold}%)', 
+                        fontsize=30)
+        else:
+            ax.set_title(f'{title}', 
+                        fontsize=30)
         ax.grid(True, which='both', linestyle='--', linewidth=0.5)
 
-        # Adding images on the plot with a border corresponding to the label color
-        for pc1, pc2, img, label in zip(pca_result[:, 0], pca_result[:, 1], self.imagery, df['Label']):
-            if self.PVI == False:
-                img = img[:,:,[2,1,0]]
-            imagebox = OffsetImage(img, zoom=zoom, alpha=0.9)  # Adjust the zoom parameter and alpha for transparency
-            ab = AnnotationBbox(imagebox, (pc1, pc2),
+        if show_images:
+            for pc1, pc2, img, label in zip(filtered_pca[:, 0], filtered_pca[:, 1], 
+                                        filtered_imagery, filtered_df['Label']):
+                if not self.PVI:
+                    img = img[:,:,[2,1,0]]
+                num = random.randint(0,100)
+                if num < percentage_show:
+                    continue
+                imagebox = OffsetImage(img, zoom=zoom, alpha=0.9)
+                label_idx = label_list.index(label)  # Get index of label in sorted list
+                ab = AnnotationBbox(imagebox, (pc1, pc2),
                                 frameon=True,
-                                bboxprops=dict(edgecolor=custom_cmap(label + num), linewidth=2), 
-                                box_alignment=(0.5, 0.5))  # Align images to the center
-            ax.add_artist(ab)
+                                bboxprops=dict(edgecolor=custom_cmap(label_idx), linewidth=2),
+                                box_alignment=(0.5, 0.5))
+                ax.add_artist(ab)
 
-        # Scatter plot with discrete colors on top of the images
-        scatter = ax.scatter(pca_result[:, 0], pca_result[:, 1], 
-                            c=df['Label'], cmap=custom_cmap, edgecolor='black', linewidth=1, s=50)
+        scatter = ax.scatter(filtered_pca[:, 0], filtered_pca[:, 1],
+                            c=[label_list.index(label) for label in filtered_df['Label']], 
+                            cmap=custom_cmap, 
+                            edgecolor='black', linewidth=1, s=50)
 
-        # Adding a color bar with discrete labels
-        cbar = plt.colorbar(scatter, ax=ax, ticks=np.arange(-1, 3), fraction=0.01, pad=0.01)
-        # cbar.set_label('Label', fontsize=12)
-        if self.PVI:
-            cbar.set_ticks([-1, 0, 1, 2])  # Ensure all four labels are present
-            cbar.set_ticklabels(['Partially Cloudy', 'Clear Sky', 'Opaque Clouds', 'No Data'])  # Custom labels for classes
-        else:
-            cbar.set_ticks(df.Label.unique())
-        # Ensure images at the border are either partially hidden or within the figure
-        ax.set_xlim([pca_result[:, 0].min() - 1, pca_result[:, 0].max() + 1])
-        ax.set_ylim([pca_result[:, 1].min() - 1, pca_result[:, 1].max() + 1])
+        # Ensure the colorbar ticks match the actual labels
+        cbar = plt.colorbar(scatter, ax=ax, ticks=range(len(label_list)), fraction=0.01, pad=0.01)
+        cbar.set_ticklabels([class_dict[label][1] for label in label_list])
+        cbar.ax.tick_params(labelsize=25)  # Adjust 20 to your desired font size
 
-        # Improving the overall appearance
-        plt.tight_layout()
+        ax.set_xlim([filtered_pca[:, 0].min() - axis_extent, filtered_pca[:, 0].max() + axis_extent])
+        ax.set_ylim([filtered_pca[:, 1].min() - axis_extent, filtered_pca[:, 1].max() + axis_extent])
+        ax.tick_params(axis='both', labelsize=25)  # Changes both x and y axis numbers
+        # plt.tight_layout()
+        if save is not None:
+            plt.savefig(save)
+        if show:
+            plt.show()
 
-        # Show plot
-        plt.show()
+
 class QuickLookPVI(QuickLookModel):
 
     def __init__(self, files, model = None):
@@ -241,9 +313,9 @@ class QuickLookPVI(QuickLookModel):
         if  len(files) <= 1 and os.path.isdir(files):
             files = fp.extract_pvi_images(files)
             self.load_zips = False
-            # print(files)
         elif len(files) > 1 and files[0].endswith(".zip"):
             self.load_zips = True
+
         elif isinstance(files, list):
             print("Starting PCA Model")
         else:
@@ -259,7 +331,6 @@ class QuickLookPVI(QuickLookModel):
     def load_data(self):
         imagery = []
         files = []
-
         if self.load_zips is False:
             for file in self.files:
                 with Image.open(file) as im:
@@ -282,8 +353,83 @@ class QuickLookPVI(QuickLookModel):
                                                             gen_from_zips = zips)
         return extract_meta.combine_metadata_w_pvi_analysis(directory, self, 
                                                             gen_from_zips = zips)
+class QuickLookAPIPVI(QuickLookModel):
 
+    def __init__(self, features, thumbnail_dir, download_thumbnails=False, model = None):
+        self.PVI = True
+        self.features = features
+        self.df = extract_meta.generate_api_df(features, thumbnail_dir, download_thumbnails=download_thumbnails)
+        self.column_updated_df = extract_meta.map_and_filter_columns(self.df)
+        self.thumbnails_dir = thumbnail_dir
+        self.files = []
+        self.imagery = []
+        self.load_data()
+        if model is None:
+            self.pca_model = PCA(n_components = 0.95)  
+        self.transformed_data = self.train()
+        self.labels = self.predict(self.transformed_data, min_samples=5, eps = 50)
+        self.column_updated_df['Label'] = self.labels
+        self.generate_class_dict()
 
+    def predict(self, transformed_data, model = None, eps=50, min_samples=5):
+        if model is None:
+            dbscan_model = DBSCAN(eps=eps, min_samples=min_samples)
+            dbscan_model.fit(transformed_data)
+            self.column_updated_df['Label'] = dbscan_model.labels_  
+            return dbscan_model.labels_       
+    def load_data(self):
+        self.imagery = []
+        self.files = []
+        valid_indices = []
+        
+        for idx, component in enumerate(self.column_updated_df.COMMON_COMPONENT):
+            file_path = os.path.join(self.thumbnails_dir, component + ".jpg")
+            self.files.append(file_path)
+            
+            try:
+                with Image.open(file_path) as im:
+                    img_array = np.array(im)
+                    if img_array.shape == (343,343,3):
+                        self.imagery.append(img_array)
+                        valid_indices.append(idx)
+                    else:
+                        print(f"Skipping {file_path}: Invalid shape {img_array.shape}")
+            except Exception as e:
+                print(f"Error processing {file_path}: {str(e)}")
+                
+        # Keep only valid rows in the DataFrame
+        self.column_updated_df = self.column_updated_df.iloc[valid_indices].reset_index(drop=True)
+        self.files = [self.files[i] for i in valid_indices]
+        self.features = filter_by_indices(self.features, valid_indices)
+    
+    def get_filtered_features(self, label):
+        return filter_by_label(self.features, self.labels, label)
+
+    def generate_class_dict(self):
+        mean_0 = np.array(self.imagery)[self.column_updated_df.Label == 0].mean()
+        mean_1 = np.array(self.imagery)[self.column_updated_df.Label == 1].mean()
+
+        class_dict = {
+            -1: ('#1f77b4', 'Partially Cloudy'),
+            2: ('#d62728', 'No Data')
+        }
+
+        if mean_0 > mean_1:
+            class_dict.update({
+                0: ('#2ca02c', 'Opaque Clouds'),
+                1: ('#ff7f0e', 'Clear Sky')
+            })
+        else:
+            class_dict.update({
+                0: ('#ff7f0e', 'Clear Sky'),
+                1: ('#2ca02c', 'Opaque Clouds')
+            })
+        self.class_dict = class_dict
+    
+    def get_cloud_free_dataset(self):
+        cloud_key = [k for k, v in self.class_dict.items() if v[1] == 'Clear Sky'][0]
+        return self.get_filtered_features(cloud_key)
+    
 class QuickLookArea(QuickLookModel):
     
     def __init__(self, df, shapefile, 
@@ -306,7 +452,7 @@ class QuickLookArea(QuickLookModel):
         self.df['Label'] = self.labels
 
     def train(self):
-        transformed_imagery = np.array(self.imagery).reshape(len(self.imagery), -1) / 10_000
+        transformed_imagery = np.array(self.imagery).reshape(len(self.imagery), -1)
         transformed_data = self.pca_model.fit_transform(transformed_imagery)
         return transformed_data
     
@@ -318,13 +464,11 @@ class QuickLookArea(QuickLookModel):
             image = load_sen2(file)
             clipped = image.clip_raster_with_shape(self.shapefile, resolution,
                                                    selected_bands=band_mapping, use_mask=False)
-            # bit hacky - fix in dataloader
-            if "N0400" in file or "N0500" in file or "N0509" in file or "N0510" in file:
-                clipped -= 1000
+            clipped -= 1000
             try:
                 clipped = np.swapaxes(clipped, 0, 2)
                 if self.stretch_type is not None:
-                    clipped = self.stretch_type(clipped)
+                    clipped = self.stretch_type(clipped) /255
                 
                 clipped = clip_image(clipped, clip_percent=2)
                 # clipped = trf.LCE_multi(clipped)
@@ -354,73 +498,12 @@ class QuickLookArea(QuickLookModel):
         filtered_df = df[df['FILE_PATH'].isin(valid_file_paths)]
         return filtered_df
 
-    def predict(self, model = None, n_components = 4):
+    def predict(self, model = None, xi = 0.05, min_samples=30, min_cluster_size = 0.01):
         if model is None:
-            model = GaussianMixture(n_components=n_components, random_state=42)
-            
-            self.df['Label'] = model.fit_predict(self.transformed_data)
+            clust = GaussianMixture(n_components=4,random_state=42)
+            clust.fit_predict(self.transformed_data)
+
+            labels = clust.fit_predict(self.transformed_data)
+            self.df['Label'] = labels
             return self.df['Label']
-         
-if __name__ == "__main__":
-    path = "/mnt/sda_mount/All_L1C_55LCD/"
-    # PVI_Files = fp.extract_pvi_images(path)
-    # print(PVI_Files)
-    limits  = ((-14.4637,145.1483),(-15.4559,146.1532))
-    from rasterio.warp import transform_bounds
-    wcmc = gpd.read_file("Data/14_001_WCMC008_CoralReefs2018_v4_1/01_Data/WCMC008_CoralReef2018_Py_v4_1.shp")
-    file = '/mnt/sda_mount/All_L1C_55LCD/S2B_MSIL1C_20220406T003659_N0400_R059_T55LCD_20220406T015555.SAFE/MTD_MSIL1C.xml'
-
-    data_loader = load_sen2(file)
-    data_loader.load()
-    limits = transform_bounds(32755 ,f'EPSG:4326', *data_loader.bounds)
-    subset_limits = ((limits[1], limits[0]), (limits[3], limits[2])) 
-    top_left = subset_limits[0]
-    bottom_right = subset_limits[1]
-
-    subset = wcmc.cx[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
-
-    subset = subset.to_crs(32755) 
-    reef = subset.sample(1, random_state = 42)
-    # image = data_loader.clip_raster_with_shape(reef, selected_bands= ['B04','B03','B02'], use_mask=False)
-
-
-    print("Retrieved shapefile")
-
-
-
-
-    qck_look = QuickLookArea(path, reef)
-    print(qck_look.labels)
-
-
-
-
-
-
-
-
-#     import timeit
-#     setup_code = """
-# import ShallowLearn.FileProcessing as fp
-
-# path = "/mnt/sda_mount/All_L1C_55LCD/"
-# PVI_Files = fp.extract_pvi_images(path)
-#     """
-
-#     test_code = """
-# from ShallowLearn.QuickLook import QuickLookPCA
-# qck_look = QuickLookPCA(PVI_Files)
-# print(qck_look.labels)
-#     """
-
-#     # Number of times to run the code
-#     num_runs = 10
-
-#     # Time the execution
-#     times = timeit.repeat(stmt=test_code, setup=setup_code, repeat=num_runs, number=1)
-
-#     # Print the times
-#     for i, t in enumerate(times):
-#         print(f"Run {i + 1}: {t:.6f} seconds")
-
-#     print(f"Average time: {sum(times) / len(times):.6f} seconds")
+        

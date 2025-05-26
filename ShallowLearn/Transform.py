@@ -82,13 +82,14 @@ def linear_contrast_enhancement(image, max_value=255):
     image[mask_nan] = 0
 
     # Get the minimum value from non-zero elements of the image
-    min_intensity = np.min(image[np.nonzero(image)]) + 0.001
+    original_min_intensity = np.min(image[np.nonzero(image)])
+    min_intensity = original_min_intensity + 0.001
 
     # Get the maximum value from the image
     max_intensity = np.max(image)
 
     # Check if maximum and minimum are the same
-    if max_intensity == min_intensity:
+    if max_intensity == original_min_intensity:
         raise ValueError("Cannot apply linear contrast enhancement: all pixel values in the image are the same.")
 
     # Apply linear contrast enhancement and clip to keep values within the desired range
@@ -154,7 +155,7 @@ def rgb_to_hsi(rgb):
     num = 0.5 * ((r - g) + (r - b))
     den = np.sqrt((r - g) ** 2 + (r - b) * (g - b))
     den = np.where(np.isnan(den), 0.00001, den) # handle NaN
-    theta = np.arccos(num / den)
+    theta = np.arccos(num + 0.0001 / den + 0.0001)
 
     H = theta.copy()
     H[b > g] = 2 * np.pi - H[b > g]

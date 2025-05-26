@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this research, please cite it as below."
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "AlZayer"
+      given-names: "Zayad"
+    - family-names: "Mason"
+      given-names: "Philippa"
+    - family-names: "Platt"
+      given-names: "Robert"
+    - family-names: "John"
+      given-names: "Cédric M."
+  title: "An Improved Machine Learning-Based Method for Unsupervised Characterisation for Coral Reef Monitoring in Earth Observation Time-Series Data"
+  journal: "Remote Sensing"
+  volume: 17
+  issue: 7
+  article-number: 1244
+  year: 2025
+  url: "https://www.mdpi.com/2072-4292/17/7/1244"
+  issn: "2072-4292"

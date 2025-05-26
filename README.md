@@ -1,62 +1,39 @@
-# ShallowLearn: Shallow Water Imaging in Python
+[![codecov](https://codecov.io/github/z-alzayer/ShallowLearn/graph/badge.svg?token=TKUAGXODRB)](https://codecov.io/github/z-alzayer/ShallowLearn)
 
-## Overview
+# ShallowLearn: A Python Toolkit for Shallow Water Remote Sensing Analysis
 
-ShallowLearn is a Python package for processing and analyzing imagery data of shallow water environments. This package is designed to provide an efficient and effective way to calculate common indices used in marine and environmental science, as well as having a basic toolbox for datascience applications for Shallow Water Imaging. Indices included Chlorophyll Index (CI), Ocean Color Index (OCI), Suspended Sediment Index (SSI), Turbidity Index (TI), Water Quality Index (WQI), and Normalized Difference Chlorophyll Index (NDCI).
+ShallowLearn provides a collection of tools and utilities designed for processing, analyzing, and visualizing satellite imagery, with a particular focus on shallow water environments like coral reefs. It includes functionalities for data loading, preprocessing, feature extraction, segmentation, time-series analysis, and visualization. This repo is a work in progress with improvements to come, I'm still in the process of refactoring now that the paper is published but hopefully I'll get to it sooner rather than later.
+
+## Features
+
+*   **Data Handling:**
+    *   Load satellite data from various formats (GeoTIFF, Sentinel-2 SAFE/ZIP).
+    *   Download Sentinel-2 via APIs (`cdsetool`).
+    *   Compile multi-band GeoTIFFs from raw Sentinel-2 bands.
+    *   Handle time series and seasonal data loading.
+*   **Image Processing:**
+    *   Radiometric normalization (PCA-based, Histogram Matching).
+    *   Image transformations (Contrast Enhancement - LCE, BCET, Color Space Conversions - LAB, HSV).
+    *   Cloud detection and masking (XGBoost-based).
+    *   Image resampling operations.
+*   **Feature Extraction:**
+    *   Calculate standard remote sensing indices.
+    *   Extract computer vision features (LBP, Gabor, HOG, Edge Density).
+    *   Generate comprehensive feature stacks combining spectral, index, and texture information.
+*   **Segmentation:**
+    *   Superpixel generation using various algorithms (SLIC, Felzenszwalb, Quickshift, Watershed).
+    *   Superpixel processing pipelines involving PCA and clustering (DBSCAN, OPTICS, GMM).
+*   **Depth Invariant Indices (DII):**
+    *   Calculate standard band-ratio DII.
+    *   Implement superpixel-based DII workflows for automated deep/shallow area identification.
+*   **Time Series Analysis:**
+    *   Process and normalize image time series.
+    *   Quick-look analysis using PCA and clustering on image thumbnails or cropped areas.
+*   **Utilities & Visualization:**
+    *   Helper functions for date extraction, band mapping, and metadata handling.
+    *   Plotting utilities for images, spectra, histograms, scatter plots with image overlays, and density plots.
 
 
-## Getting Started
+[Documentation is available here](https://z-alzayer.github.io/ShallowLearn/)
 
-### Dependencies
-
-ShallowLearn uses the conda package manager to handle its environment. All necessary packages are listed in the `environment.yml` file. The key dependencies include `numpy`, `matplotlib`, and `ipywidgets`.
-
-### Installation
-
-To install the ShallowLearn package and its dependencies, clone the repository and use conda to create the environment:
-
-```bash
-git clone https://github.com/yourusername/ShallowLearn.git
-cd ShallowLearn
-conda env create -f environment.yml
-pip install -e .
-```
-You'll need to install gdal beforehand look up the specific installation instructions for your OS.
-Debian based linux should be:
-```
-sudo apt install gdal
-```
-macos
-```
-brew install gdal
-```
-Windows/WSL
-```
-conda install -c conda-forge gdal
-```
-### Usage
-
-ShallowLearn is a Python package and can be imported like any other package. A typical usage scenario would be as follows:
-```
-python
-
-import numpy as np
-from ShallowLearn.LoadData import LoadGeoTIFF
-from ShallowLearn.LoadData import LoadFromCSV
-from ShallowLearn.Indices import ci, oci, ssi, ti, wqi, ndci
-
-data_source = '/path/to/your/data/multiband_raster.tif'
-img = LoadGeoTIFF(data_source).load()
-
-# or if you have a csv with a column called full_path (containing path to directory)
-data_source = '/path/to/your/data/file.csv'
-img_array = LoadFromCSV(data_source).load()
-
-plt.imshow(ci(img))
-
-# or 
-for img in img_array:
-  plt.imshow(img)
-
-# Additional functionality is included in the jupyter notebooks 
-'''
+If you've found any of the code useful please cite our [paper](https://www.mdpi.com/2072-4292/17/7/1244) 
