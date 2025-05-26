@@ -207,3 +207,4 @@ dependencies:
       - contextily
       - matplotlib_scalebar
       - dash
+      - cdsetool
