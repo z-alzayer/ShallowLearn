@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up Conda environment
       uses: conda-incubator/setup-miniconda@v2
@@ -26,8 +26,8 @@ jobs:
     - name: Install dependencies
       shell: bash
       run: |
+        conda config --add channels defaults
         sudo apt-get update
-        sudo apt-get install -y gdal-bin
         pip install -e .
     - name: Run tests
       shell: bash -l {0}
@@ -36,15 +36,10 @@ jobs:
         ls
         conda info
         conda list
+        export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
         python -m coverage run --source ShallowLearn -m pytest
         python -m coverage xml -o coverage.xml
-    - name: Upload coverage report
-      uses: actions/upload-artifact@v3
+    - name: Upload results to Codecov
+      uses: codecov/codecov-action@v5
       with:
-        name: coverage
-        path: coverage.xml
-    - uses: actions/checkout@master
-    - uses: codecov/codecov-action@v3
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
-        files: coverage.xml
+        token: ${{ secrets.CODECOV_TOKEN }}
