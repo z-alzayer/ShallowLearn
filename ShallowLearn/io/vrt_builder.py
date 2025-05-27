@@ -173,9 +173,17 @@ class LandsatVRTBuilder(VRTBuilder):
             expanded_bounds = self.expand_bounds(
                 bounds.total_bounds, n_pixels, pixel_size
             )
-            ulx, uly, lrx, lry = self.transform_bounds(
-                expanded_bounds, "EPSG:4326", raster_crs.to_string()
-            )
+            
+            # Check if bounds CRS matches raster CRS
+            bounds_crs = str(bounds.crs) if bounds.crs else "EPSG:4326"
+            if bounds_crs == raster_crs.to_string():
+                # No transformation needed
+                ulx, uly, lrx, lry = expanded_bounds[0], expanded_bounds[3], expanded_bounds[2], expanded_bounds[1]
+            else:
+                # Transform from bounds CRS to raster CRS
+                ulx, uly, lrx, lry = self.transform_bounds(
+                    expanded_bounds, bounds_crs, raster_crs.to_string()
+                )
 
             # Crop VRT
             gdal.Translate(
@@ -206,7 +214,7 @@ class LandsatVRTBuilder(VRTBuilder):
         return band_files
 
     def _parse_metadata(self, archive_path: str) -> Dict[str, Any]:
-        """Parse MTL metadata from Landsat tar archive."""
+        """Parse comprehensive MTL metadata from Landsat tar archive."""
         mtl_dict = {}
         stack = []
 
@@ -217,7 +225,10 @@ class LandsatVRTBuilder(VRTBuilder):
             if mtl_member is None:
                 raise FileNotFoundError("MTL.txt not found in tar archive")
 
+            # Enhanced MTL parsing - capture all fields with proper hierarchy
             mtl_file = tar.extractfile(mtl_member)
+            current_group = None
+            
             for line_bytes in mtl_file:
                 line = line_bytes.decode("utf-8").strip()
                 if not line or line == "END":
@@ -226,15 +237,70 @@ class LandsatVRTBuilder(VRTBuilder):
                 if line.startswith("GROUP = "):
                     group = line.split("=", 1)[1].strip()
                     stack.append(group)
+                    current_group = group
                 elif line.startswith("END_GROUP"):
                     if stack:
                         stack.pop()
+                    current_group = stack[-1] if stack else None
                 elif "=" in line:
                     key, value = line.split("=", 1)
                     key = key.strip()
                     value = value.strip().strip('"')
+                    
+                    # Create hierarchical key with full path
                     full_key = ".".join(stack + [key])
                     mtl_dict[full_key] = value
+                    
+                    # Also create simplified keys for commonly used metadata
+                    if stack:
+                        simplified_key = f"{stack[-1]}.{key}"
+                        mtl_dict[simplified_key] = value
+                    
+                    # Create top-level keys for critical metadata fields
+                    critical_fields = [
+                        'LANDSAT_SCENE_ID', 'LANDSAT_PRODUCT_ID', 'SPACECRAFT_ID', 'SENSOR_ID',
+                        'DATE_ACQUIRED', 'SCENE_CENTER_TIME', 'WRS_PATH', 'WRS_ROW',
+                        'CLOUD_COVER', 'SUN_AZIMUTH', 'SUN_ELEVATION', 'EARTH_SUN_DISTANCE',
+                        'PROCESSING_SOFTWARE_VERSION', 'COLLECTION_NUMBER', 'COLLECTION_CATEGORY',
+                        'TARGET_WRS_PATH', 'TARGET_WRS_ROW', 'NADIR_OFFNADIR', 'ROLL_ANGLE',
+                        'THERMAL_LINES', 'REFLECTIVE_LINES', 'THERMAL_SAMPLES', 'REFLECTIVE_SAMPLES',
+                        'GRID_CELL_SIZE_THERMAL', 'GRID_CELL_SIZE_REFLECTIVE', 'GRID_CELL_SIZE_PANCHROMATIC',
+                        'ORIGIN_LAT', 'ORIGIN_LON', 'CORNER_UL_LAT_PRODUCT', 'CORNER_UL_LON_PRODUCT',
+                        'CORNER_UR_LAT_PRODUCT', 'CORNER_UR_LON_PRODUCT', 'CORNER_LL_LAT_PRODUCT',
+                        'CORNER_LL_LON_PRODUCT', 'CORNER_LR_LAT_PRODUCT', 'CORNER_LR_LON_PRODUCT',
+                        'CORNER_UL_PROJECTION_X_PRODUCT', 'CORNER_UL_PROJECTION_Y_PRODUCT',
+                        'CORNER_UR_PROJECTION_X_PRODUCT', 'CORNER_UR_PROJECTION_Y_PRODUCT',
+                        'CORNER_LL_PROJECTION_X_PRODUCT', 'CORNER_LL_PROJECTION_Y_PRODUCT',
+                        'CORNER_LR_PROJECTION_X_PRODUCT', 'CORNER_LR_PROJECTION_Y_PRODUCT',
+                        'PANCHROMATIC_LINES', 'PANCHROMATIC_SAMPLES', 'FILE_DATE', 'STATION_ID',
+                        'GROUND_CONTROL_POINTS_VERSION', 'GROUND_CONTROL_POINTS_MODEL',
+                        'GEOMETRIC_RMSE_MODEL', 'GEOMETRIC_RMSE_MODEL_Y', 'GEOMETRIC_RMSE_MODEL_X'
+                    ]
+                    
+                    if key in critical_fields:
+                        mtl_dict[key] = value
+                    
+                    # Add band-specific metadata with enhanced structure
+                    if key.startswith('FILE_NAME_BAND_'):
+                        band_num = key.split('_')[-1]
+                        mtl_dict[f'BAND_{band_num}_FILENAME'] = value
+                    elif key.startswith('RADIANCE_MAXIMUM_BAND_'):
+                        band_num = key.split('_')[-1]
+                        mtl_dict[f'BAND_{band_num}_RADIANCE_MAX'] = value
+                    elif key.startswith('RADIANCE_MINIMUM_BAND_'):
+                        band_num = key.split('_')[-1]
+                        mtl_dict[f'BAND_{band_num}_RADIANCE_MIN'] = value
+                    elif key.startswith('REFLECTANCE_MAXIMUM_BAND_'):
+                        band_num = key.split('_')[-1]
+                        mtl_dict[f'BAND_{band_num}_REFLECTANCE_MAX'] = value
+                    elif key.startswith('REFLECTANCE_MINIMUM_BAND_'):
+                        band_num = key.split('_')[-1]
+                        mtl_dict[f'BAND_{band_num}_REFLECTANCE_MIN'] = value
+
+            # Add archive-level metadata
+            mtl_dict['MTL_FILE_PATH'] = mtl_member.name
+            mtl_dict['ARCHIVE_PATH'] = archive_path
+            mtl_dict['TOTAL_MTL_FIELDS'] = str(len(mtl_dict))
 
         return mtl_dict
 
@@ -376,9 +442,17 @@ class Sentinel2VRTBuilder(VRTBuilder):
             expanded_bounds = self.expand_bounds(
                 bounds.total_bounds, n_pixels, pixel_size
             )
-            ulx, uly, lrx, lry = self.transform_bounds(
-                expanded_bounds, "EPSG:4326", str(raster_crs)
-            )
+            
+            # Check if bounds CRS matches raster CRS
+            bounds_crs = str(bounds.crs) if bounds.crs else "EPSG:4326"
+            if bounds_crs == str(raster_crs):
+                # No transformation needed
+                ulx, uly, lrx, lry = expanded_bounds[0], expanded_bounds[3], expanded_bounds[2], expanded_bounds[1]
+            else:
+                # Transform from bounds CRS to raster CRS
+                ulx, uly, lrx, lry = self.transform_bounds(
+                    expanded_bounds, bounds_crs, str(raster_crs)
+                )
 
             # Crop VRT
             gdal.Translate(
@@ -468,50 +542,108 @@ class Sentinel2VRTBuilder(VRTBuilder):
         return CRS.from_wkt(raster_crs_wkt)
 
     def _parse_metadata(self, archive_path: str) -> Dict[str, Any]:
-        """Parse XML metadata from Sentinel-2 ZIP archive."""
+        """Parse comprehensive metadata from Sentinel-2 ZIP archive using subdatasets approach."""
         import xml.etree.ElementTree as ET
+        import rasterio
 
         metadata = {}
+        
+        # First, get metadata from subdatasets (like original LoadSentinel2L1C)
+        try:
+            # Find the main metadata file for subdatasets
+            with zipfile.ZipFile(archive_path, "r") as zip_ref:
+                mtd_files = [f for f in zip_ref.namelist() if "MTD_MSIL" in f and f.endswith(".xml")]
+                if not mtd_files:
+                    raise FileNotFoundError("MTD_MSIL*.xml not found in ZIP archive")
+                
+                mtd_file_path = mtd_files[0]
+                zip_path = f"/vsizip/{archive_path}"
+                full_mtd_path = os.path.join(zip_path, mtd_file_path)
+                
+                # Open subdatasets using the MTD file (original approach)
+                with rasterio.open(full_mtd_path) as dataset:
+                    subdatasets = dataset.subdatasets
+                    
+                    if subdatasets:
+                        # Extract metadata from first subdataset
+                        with rasterio.open(subdatasets[0]) as first_array:
+                            # Get comprehensive rasterio metadata
+                            raster_tags = first_array.tags()
+                            raster_profile = first_array.profile
+                            raster_metadata = first_array.meta
+                            raster_offsets = first_array.offsets
+                            raster_bounds = first_array.bounds
+                            
+                            # Add rasterio metadata to our metadata dict
+                            metadata.update({
+                                'RASTER_TAGS': raster_tags,
+                                'RASTER_PROFILE_WIDTH': str(raster_profile.get('width', '')),
+                                'RASTER_PROFILE_HEIGHT': str(raster_profile.get('height', '')),
+                                'RASTER_PROFILE_COUNT': str(raster_profile.get('count', '')),
+                                'RASTER_PROFILE_DTYPE': str(raster_profile.get('dtype', '')),
+                                'RASTER_PROFILE_CRS': str(raster_profile.get('crs', '')),
+                                'RASTER_BOUNDS_LEFT': str(raster_bounds.left),
+                                'RASTER_BOUNDS_BOTTOM': str(raster_bounds.bottom),
+                                'RASTER_BOUNDS_RIGHT': str(raster_bounds.right),
+                                'RASTER_BOUNDS_TOP': str(raster_bounds.top),
+                                'RASTER_TRANSFORM': str(raster_profile.get('transform', '')),
+                                'SUBDATASETS_COUNT': str(len(subdatasets))
+                            })
+                            
+                            # Add band offsets if available
+                            if raster_offsets:
+                                for i, offset in enumerate(raster_offsets):
+                                    if offset is not None:
+                                        metadata[f'BAND_{i+1}_OFFSET'] = str(offset)
+                            
+                            # Add additional raster tags as individual metadata items
+                            for key, value in raster_tags.items():
+                                metadata[f'TAG_{key}'] = str(value)
 
+        except Exception as e:
+            print(f"Warning: Could not extract subdataset metadata: {e}")
+
+        # Now extract XML metadata (enhanced approach)
         with zipfile.ZipFile(archive_path, "r") as zip_ref:
-            # Find the main metadata file
-            mtd_files = [
-                f for f in zip_ref.namelist() if "MTD_MSIL" in f and f.endswith(".xml")
-            ]
+            mtd_files = [f for f in zip_ref.namelist() if "MTD_MSIL" in f and f.endswith(".xml")]
+            
+            if mtd_files:
+                with zip_ref.open(mtd_files[0]) as xml_file:
+                    tree = ET.parse(xml_file)
+                    root = tree.getroot()
 
-            if not mtd_files:
-                raise FileNotFoundError("MTD_MSIL*.xml not found in ZIP archive")
-
-            # Parse XML metadata
-            with zip_ref.open(mtd_files[0]) as xml_file:
-                tree = ET.parse(xml_file)
-                root = tree.getroot()
-
-                # Extract comprehensive metadata
-                metadata['MTD_FILE'] = mtd_files[0]
-                
-                # Get product information
-                for elem in root.iter():
-                    tag_name = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
+                    # Enhanced XML metadata extraction - capture more fields
+                    metadata['MTD_FILE'] = mtd_files[0]
                     
-                    # Key metadata fields
-                    if tag_name in ['PRODUCT_URI', 'PROCESSING_LEVEL', 'SPACECRAFT_NAME', 
-                                   'DATATAKE_IDENTIFIER', 'SENSING_TIME', 'PRODUCT_TYPE',
-                                   'PROCESSING_BASELINE', 'GENERATION_TIME', 'CLOUD_COVERAGE_ASSESSMENT']:
-                        if elem.text:
+                    # Extract all text elements with meaningful content
+                    for elem in root.iter():
+                        tag_name = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
+                        
+                        # Comprehensive list of important metadata fields
+                        important_fields = [
+                            'PRODUCT_URI', 'PROCESSING_LEVEL', 'SPACECRAFT_NAME', 
+                            'DATATAKE_IDENTIFIER', 'SENSING_TIME', 'PRODUCT_TYPE',
+                            'PROCESSING_BASELINE', 'GENERATION_TIME', 'CLOUD_COVERAGE_ASSESSMENT',
+                            'HORIZONTAL_CS_NAME', 'HORIZONTAL_CS_CODE', 'GEOMETRIC_QUALITY_FLAG',
+                            'GENERAL_QUALITY_FLAG', 'RADIOMETRIC_QUALITY_FLAG', 'SENSOR_QUALITY_FLAG',
+                            'MEAN_SUN_ANGLE', 'MEAN_VIEWING_INCIDENCE_ANGLE', 'MEAN_VIEWING_AZIMUTH_ANGLE',
+                            'QUANTIFICATION_VALUE', 'REFLECTANCE_CONVERSION', 'U', 'SPECIAL_VALUE_NODATA',
+                            'SPECIAL_VALUE_SATURATED', 'TILE_ID', 'DATASTRIP_ID', 'ARCHIVING_CENTRE',
+                            'ARCHIVING_TIME', 'DEGRADED_ANC_DATA_PERCENTAGE', 'DEGRADED_MSI_DATA_PERCENTAGE'
+                        ]
+                        
+                        if tag_name in important_fields and elem.text:
                             metadata[tag_name] = elem.text
-                    
-                    # Geometric information
-                    elif tag_name in ['HORIZONTAL_CS_NAME', 'HORIZONTAL_CS_CODE']:
-                        if elem.text:
-                            metadata[tag_name] = elem.text
-                
-                # Add band count information
-                band_count = 0
-                for elem in root.iter():
-                    if 'BAND_NAME' in elem.tag and elem.text:
-                        band_count += 1
-                metadata['ORIGINAL_BAND_COUNT'] = str(band_count)
+                        
+                        # Also capture band-specific information
+                        elif 'BAND_NAME' in tag_name and elem.text:
+                            parent = elem.getparent()
+                            if parent is not None:
+                                band_info_key = f"BAND_INFO_{elem.text}"
+                                for child in parent:
+                                    child_tag = child.tag.split('}')[-1] if '}' in child.tag else child.tag
+                                    if child.text and child_tag != 'BAND_NAME':
+                                        metadata[f"{band_info_key}_{child_tag}"] = child.text
 
         return metadata
 
