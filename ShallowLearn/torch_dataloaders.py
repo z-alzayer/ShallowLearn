@@ -57,8 +57,7 @@ class SatelliteDataset(Dataset):
                  target_size: Tuple[int, int] = (512, 512),
                  bands: List[str] = None,
                  transform: Optional[callable] = None,
-                 filter_invalid: bool = True,
-                 min_valid_bands: int = 4):
+                 auto_find_common_bands: bool = True):
         """
         Initialize the satellite dataset.
         
@@ -75,20 +74,16 @@ class SatelliteDataset(Dataset):
         target_size : Tuple[int, int], default=(512, 512)
             Target image dimensions (height, width)
         bands : List[str], optional
-            Specific bands to use (Landsat nomenclature). If None, uses COMMON_BANDS
+            Specific bands to use (Landsat nomenclature). If None, auto-discovers common bands
         transform : callable, optional
             Additional transforms to apply
-        filter_invalid : bool, default=True
-            Whether to filter out images with insufficient valid bands
-        min_valid_bands : int, default=4
-            Minimum number of valid bands required if filtering
+        auto_find_common_bands : bool, default=True
+            Whether to automatically find common bands across all files
         """
         
         self.target_size = target_size
-        self.bands = bands if bands is not None else self.COMMON_BANDS.copy()
         self.transform = transform
-        self.filter_invalid = filter_invalid
-        self.min_valid_bands = min_valid_bands
+        self.auto_find_common_bands = auto_find_common_bands
         
         # Collect file paths
         self.satellite_files = []
@@ -116,36 +111,46 @@ class SatelliteDataset(Dataset):
         if not self.satellite_files:
             raise ValueError("No satellite files found. Provide either file paths or directories.")
         
-        # Filter invalid files if requested
-        if self.filter_invalid:
-            self._filter_valid_files()
+        # Auto-discover common bands if requested
+        if self.auto_find_common_bands or bands is None:
+            self.bands = self._find_common_bands()
+            if not self.bands:
+                raise ValueError("No common bands found across all files")
+        else:
+            self.bands = bands
         
         print(f"Dataset initialized with {len(self.satellite_files)} files")
-        print(f"Target bands: {self.bands}")
+        print(f"Common bands found: {self.bands}")
         print(f"Target size: {self.target_size}")
     
-    def _filter_valid_files(self):
-        """Filter out files that don't meet minimum band requirements."""
-        valid_files = []
+    def _find_common_bands(self) -> List[str]:
+        """Find bands that are available in ALL files."""
+        print("Discovering common bands across all files...")
+        
+        all_available_bands = []
         
         for sat_type, file_path in self.satellite_files:
             try:
-                # Quick validation - load metadata only
                 img = create_satellite_image(file_path)
-                
-                # Check how many requested bands are available
                 unified_bands = self._get_unified_bands(img, sat_type)
-                available_bands = sum(1 for band in self.bands if band in unified_bands)
+                # Only include bands that actually have data (not placeholders)
+                available_bands = list(unified_bands.keys())
+                all_available_bands.append(set(available_bands))
+                print(f"  {Path(file_path).name}: {len(available_bands)} bands - {available_bands}")
                 
-                if available_bands >= self.min_valid_bands:
-                    valid_files.append((sat_type, file_path))
-                else:
-                    warnings.warn(f"Skipping {file_path}: only {available_bands}/{len(self.bands)} bands available")
-                    
             except Exception as e:
-                warnings.warn(f"Skipping {file_path}: {str(e)}")
+                warnings.warn(f"Error reading {file_path}: {str(e)}")
+                continue
         
-        self.satellite_files = valid_files
+        if not all_available_bands:
+            return []
+        
+        # Find intersection of all band sets
+        common_bands = set.intersection(*all_available_bands)
+        common_bands_list = sorted(list(common_bands), key=lambda x: int(x[1:]) if x[1:].isdigit() else 999)
+        
+        print(f"Common bands across all files: {common_bands_list}")
+        return common_bands_list
     
     def _get_unified_bands(self, img, sat_type: str) -> Dict[str, int]:
         """Get unified band mapping for the image."""
@@ -154,11 +159,20 @@ class SatelliteDataset(Dataset):
             unified = {}
             for s2_band, landsat_band in self.BAND_MAPPING.items():
                 if img.has_band(s2_band):
-                    unified[landsat_band] = img.band_order[s2_band]
+                    # If this Landsat band is already mapped, prioritize certain S2 bands
+                    if landsat_band not in unified:
+                        unified[landsat_band] = s2_band  # Store S2 band name, not index
+                    else:
+                        # Priority: B08 > B05 > B06 > B07 for NIR (B5)
+                        if landsat_band == 'B5':
+                            priority = {'B08': 1, 'B05': 2, 'B06': 3, 'B07': 4, 'B8A': 5}
+                            current_s2 = unified[landsat_band]
+                            if priority.get(s2_band, 6) < priority.get(current_s2, 6):
+                                unified[landsat_band] = s2_band
             return unified
         else:
             # Landsat already uses correct nomenclature
-            return {band: idx for band, idx in img.band_order.items() if img.has_band(band)}
+            return {band: band for band in img.band_order.keys() if img.has_band(band)}
     
     def _resize_image(self, image: np.ndarray) -> np.ndarray:
         """Resize image to target dimensions."""
@@ -182,37 +196,29 @@ class SatelliteDataset(Dataset):
             return np.array(resized)
     
     def _extract_bands(self, img, sat_type: str) -> np.ndarray:
-        """Extract and align requested bands from satellite image."""
+        """Extract and align requested bands from satellite image (only existing bands, no NaNs)."""
+        band_arrays = []
         unified_bands = self._get_unified_bands(img, sat_type)
         
-        # Extract requested bands in order
-        band_arrays = []
         for band_name in self.bands:
             if band_name in unified_bands:
                 if sat_type == 'sentinel2':
-                    # Find the original Sentinel-2 band name
-                    s2_band = None
-                    for s2_name, landsat_name in self.BAND_MAPPING.items():
-                        if landsat_name == band_name and img.has_band(s2_name):
-                            s2_band = s2_name
-                            break
-                    
-                    if s2_band:
-                        band_data = img.get_band_data(s2_band)
+                    # Get the S2 band name that maps to this Landsat band
+                    s2_band = unified_bands[band_name]
+                    band_data = img.get_band_data(s2_band)
+                    if band_data is not None:
+                        band_arrays.append(band_data)
                     else:
-                        band_data = np.full((img.image.shape[0], img.image.shape[1]), np.nan)
+                        raise ValueError(f"Failed to extract Sentinel-2 band {s2_band} -> {band_name}")
                 else:
                     # Landsat - direct mapping
                     band_data = img.get_band_data(band_name)
-                
-                if band_data is not None:
-                    band_arrays.append(band_data)
-                else:
-                    # Create NaN placeholder
-                    band_arrays.append(np.full((img.image.shape[0], img.image.shape[1]), np.nan))
+                    if band_data is not None:
+                        band_arrays.append(band_data)
+                    else:
+                        raise ValueError(f"Failed to extract Landsat band {band_name}")
             else:
-                # Band not available - create NaN placeholder
-                band_arrays.append(np.full((img.image.shape[0], img.image.shape[1]), np.nan))
+                raise ValueError(f"Band {band_name} not available in {sat_type} image")
         
         return np.stack(band_arrays, axis=2)
     
@@ -249,16 +255,8 @@ class SatelliteDataset(Dataset):
             }
             
         except Exception as e:
-            # Return a tensor of NaNs if loading fails
-            warnings.warn(f"Failed to load {file_path}: {str(e)}")
-            nan_tensor = torch.full((len(self.bands), *self.target_size), np.nan)
-            
-            return {
-                'image': nan_tensor,
-                'satellite_type': sat_type,
-                'file_path': file_path,
-                'bands': self.bands
-            }
+            # Re-raise the exception since we want to catch data issues early
+            raise RuntimeError(f"Failed to load {file_path}: {str(e)}") from e
     
     def get_band_statistics(self) -> Dict[str, Dict[str, float]]:
         """Calculate statistics for each band across the dataset."""
@@ -272,14 +270,11 @@ class SatelliteDataset(Dataset):
                 for band_idx, band_name in enumerate(self.bands):
                     band_data = image[band_idx].numpy()
                     
-                    # Skip NaN values
-                    valid_data = band_data[~np.isnan(band_data)]
-                    
-                    if len(valid_data) > 0:
-                        stats[band_name]['mean'].append(np.mean(valid_data))
-                        stats[band_name]['std'].append(np.std(valid_data))
-                        stats[band_name]['min'].append(np.min(valid_data))
-                        stats[band_name]['max'].append(np.max(valid_data))
+                    # All data should be valid (no NaNs)
+                    stats[band_name]['mean'].append(np.mean(band_data))
+                    stats[band_name]['std'].append(np.std(band_data))
+                    stats[band_name]['min'].append(np.min(band_data))
+                    stats[band_name]['max'].append(np.max(band_data))
                         
             except Exception as e:
                 warnings.warn(f"Error calculating stats for index {idx}: {str(e)}")
@@ -295,9 +290,8 @@ class SatelliteDataset(Dataset):
                     'max': np.max(stats[band_name]['max'])
                 }
             else:
-                aggregated_stats[band_name] = {
-                    'mean': np.nan, 'std': np.nan, 'min': np.nan, 'max': np.nan
-                }
+                # Should not happen with common bands approach
+                raise ValueError(f"No statistics available for band {band_name}")
         
         return aggregated_stats
 
@@ -312,6 +306,7 @@ def create_satellite_dataloader(
     num_workers: int = 4,
     target_size: Tuple[int, int] = (512, 512),
     bands: List[str] = None,
+    auto_find_common_bands: bool = True,
     **dataset_kwargs
 ) -> DataLoader:
     """
@@ -336,7 +331,9 @@ def create_satellite_dataloader(
     target_size : Tuple[int, int], default=(512, 512)
         Target image dimensions
     bands : List[str], optional
-        Specific bands to use
+        Specific bands to use (if None, auto-discovers common bands)
+    auto_find_common_bands : bool, default=True
+        Whether to automatically find common bands across all files
     **dataset_kwargs
         Additional arguments for SatelliteDataset
     
@@ -353,6 +350,7 @@ def create_satellite_dataloader(
         landsat_dir=landsat_dir,
         target_size=target_size,
         bands=bands,
+        auto_find_common_bands=auto_find_common_bands,
         **dataset_kwargs
     )
     
