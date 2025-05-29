@@ -9,9 +9,16 @@ from skimage.segmentation import (
 from skimage.filters import threshold_multiotsu
 from sklearn.decomposition import PCA
 from sklearn.cluster import DBSCAN
+from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import MinMaxScaler
 from typing import Tuple, List, Optional, Union
 import warnings
+
+# Import StandardDII for depth invariant calculations
+try:
+    from ..StandardDII import calculate_slope_from_values, apply_depth_invariant_index
+except ImportError:
+    from ShallowLearn.StandardDII import calculate_slope_from_values, apply_depth_invariant_index
 
 # Suppress sklearn warnings
 warnings.filterwarnings('ignore', category=UserWarning)
@@ -436,38 +443,35 @@ def extract_dii(image: np.ndarray,
     return dii_results
 
 
-def process_superpixel_pipeline(image: np.ndarray,
-                              segmentation_method: str = 'slic',
-                              n_segments: int = 1000,
-                              pca_components: int = 5,
-                              eps: float = 0.5,
-                              min_samples: int = 5) -> dict:
+def create_superpixel_dii_stack(image: np.ndarray,
+                               n_segments: int = 110,
+                               bands: List[int] = [0, 1, 2],
+                               correction_factor: int = 10,
+                               segmentation_method: str = 'slic') -> Tuple[np.ndarray, np.ndarray, dict]:
     """
-    Complete superpixel processing pipeline.
-
+    Create superpixels and generate DII stack following StandardDII methodology.
+    
     Parameters:
     -----------
     image : np.ndarray
-        Input image array
+        Input image array (height, width, channels)
+    n_segments : int, default=110
+        Number of superpixel segments
+    bands : List[int], default=[0, 1, 2]
+        Bands to use for superpixel creation
+    correction_factor : int, default=10
+        Compactness factor for SLIC segmentation
     segmentation_method : str, default='slic'
-        Segmentation method ('slic', 'felzenszwalb', 'quickshift')
-    n_segments : int, default=1000
-        Number of segments for SLIC
-    pca_components : int, default=5
-        Number of PCA components
-    eps : float, default=0.5
-        DBSCAN epsilon parameter
-    min_samples : int, default=5
-        DBSCAN minimum samples parameter
-
+        Segmentation method to use
+    
     Returns:
     --------
-    dict
-        Results containing segments, patches, features, clusters, and DII
+    Tuple[np.ndarray, np.ndarray, dict]
+        (features, segments, results_dict)
     """
-    # Segmentation
+    # Create superpixel segmentation
     if segmentation_method == 'slic':
-        segments = slic_segmentation(image, n_segments=n_segments)
+        segments = slic_segmentation(image, n_segments=n_segments, compactness=correction_factor)
     elif segmentation_method == 'felzenszwalb':
         segments = felzenszwalb_segmentation(image)
     elif segmentation_method == 'quickshift':
@@ -475,26 +479,127 @@ def process_superpixel_pipeline(image: np.ndarray,
     else:
         raise ValueError(f"Unknown segmentation method: {segmentation_method}")
     
-    # Extract patches
-    patches = extract_patches(image, segments)
+    # Process with DII pipeline
+    results = process_superpixel_dii_pipeline(image, segments, bands=bands)
     
-    # PCA transformation
-    features = pca_segments(patches, n_components=pca_components)
+    # Extract features (mean values for each superpixel)
+    features = results['features']
     
-    # Clustering
-    if features.size > 0:
-        scaled_features = scale_features(features)
-        clusters = cluster_segments(scaled_features, eps=eps, min_samples=min_samples)
-    else:
-        clusters = np.array([])
+    return features, segments, results
+
+
+def process_superpixel_dii_pipeline(image: np.ndarray,
+                                   segments: np.ndarray,
+                                   bands: List[int] = [0, 1, 2],
+                                   n_components: int = 3,
+                                   band_combos: List[Tuple[int, int]] = None) -> dict:
+    """
+    Complete superpixel processing pipeline using StandardDII approach.
+
+    Parameters:
+    -----------
+    image : np.ndarray
+        Input image array (height, width, channels)
+    segments : np.ndarray
+        Segmentation labels array
+    bands : List[int], default=[0, 1, 2]
+        Bands to use for PCA transformation
+    n_components : int, default=3
+        Number of components for Gaussian Mixture Model
+    band_combos : List[Tuple[int, int]], optional
+        Band combinations for DII calculation. If None, uses default combinations.
+
+    Returns:
+    --------
+    dict
+        Results containing segments, deep/shallow masks, clusters, and DII stack
+    """
+    # Default band combinations for DII calculation
+    if band_combos is None:
+        band_combos = [
+            (1, 5), (2, 3), (2, 4), (1, 2), (0, 3),
+            (1, 4), (1, 3), (4, 8), (2, 9), (2, 5)
+        ]
     
-    # DII extraction
-    dii_results = extract_dii(image, clusters, segments, patches) if clusters.size > 0 else {}
+    # Extract superpixel features for specified bands
+    unique_segments = np.unique(segments)
+    if unique_segments[0] == 0:  # Remove background if present
+        unique_segments = unique_segments[1:]
+    
+    # Create feature matrix: each row is a superpixel, columns are band values
+    features = []
+    for segment_id in unique_segments:
+        mask = segments == segment_id
+        segment_pixels = image[mask]
+        if len(segment_pixels) > 0:
+            # Use mean values for the specified bands
+            segment_features = np.mean(segment_pixels[:, bands], axis=0)
+            features.append(segment_features)
+        else:
+            features.append(np.zeros(len(bands)))
+    
+    features = np.array(features)
+    
+    # Apply PCA transformation
+    pca = PCA(n_components=min(3, features.shape[1]))
+    transformed = pca.fit_transform(features)
+    
+    # Apply Gaussian Mixture Model clustering
+    gmm = GaussianMixture(n_components=n_components, random_state=42)
+    cluster_labels = gmm.fit_predict(transformed)
+    
+    # Determine the 'deep' cluster based on minimum mean value of first component
+    deep_idx = np.argmin(gmm.means_[:, 0])
+    
+    # Create cluster map
+    temp_arr = np.zeros_like(segments)
+    for idx, segment_id in enumerate(unique_segments):
+        temp_arr[segments == segment_id] = cluster_labels[idx]
+    
+    # Create deep and shallow masks
+    deep_mask = temp_arr == deep_idx
+    shallow_mask = temp_arr != deep_idx
+    
+    # Extract deep and shallow pixel values
+    deep_pixels = image[deep_mask]
+    shallow_pixels = image[shallow_mask]
+    
+    # Calculate DII for each band combination
+    stack_shape = (*image.shape[:2], len(band_combos))
+    dii_stack = np.zeros(stack_shape)
+    
+    for idx, (band1, band2) in enumerate(band_combos):
+        # Check if bands exist in image
+        if band1 >= image.shape[2] or band2 >= image.shape[2]:
+            continue
+            
+        # Calculate slope using StandardDII method
+        ki, (Ls_i, Ls_j) = calculate_slope_from_values(
+            deep_i=deep_pixels[:, band1],
+            deep_j=deep_pixels[:, band2],
+            shallow_i=shallow_pixels[:, band1],
+            shallow_j=shallow_pixels[:, band2]
+        )
+        
+        # Apply DII transformation to entire image
+        dii_stack[:, :, idx] = apply_depth_invariant_index(
+            image[:, :, band1],
+            image[:, :, band2],
+            ki,
+            (Ls_i, Ls_j)
+        )
     
     return {
         'segments': segments,
-        'patches': patches,
+        'cluster_map': temp_arr,
+        'deep_mask': deep_mask,
+        'shallow_mask': shallow_mask,
+        'deep_idx': deep_idx,
+        'cluster_labels': cluster_labels,
         'features': features,
-        'clusters': clusters,
-        'dii': dii_results
+        'transformed_features': transformed,
+        'gmm': gmm,
+        'pca': pca,
+        'dii_stack': dii_stack,
+        'band_combos': band_combos
     }
