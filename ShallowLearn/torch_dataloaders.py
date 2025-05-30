@@ -182,10 +182,13 @@ class SatelliteDataset(Dataset):
             # Landsat already uses correct nomenclature
             return {band: band for band in img.band_order.keys() if img.has_band(band)}
     
-    def _resize_image(self, image: np.ndarray) -> np.ndarray:
+    def _resize_image(self, image: np.ndarray, is_label: bool = False) -> np.ndarray:
         """Resize image to target dimensions."""
         if image.shape[:2] == self.target_size:
             return image
+        
+        # Choose interpolation method based on content type
+        interpolation = Image.NEAREST if is_label else Image.BILINEAR
         
         # Handle multi-band images
         if len(image.shape) == 3:
@@ -194,13 +197,13 @@ class SatelliteDataset(Dataset):
                 band = image[:, :, band_idx]
                 # Use PIL for better interpolation
                 pil_img = Image.fromarray(band.astype(np.float32))
-                resized = pil_img.resize((self.target_size[1], self.target_size[0]), Image.BILINEAR)
+                resized = pil_img.resize((self.target_size[1], self.target_size[0]), interpolation)
                 resized_bands.append(np.array(resized))
             return np.stack(resized_bands, axis=2)
         else:
             # Single band
             pil_img = Image.fromarray(image.astype(np.float32))
-            resized = pil_img.resize((self.target_size[1], self.target_size[0]), Image.BILINEAR)
+            resized = pil_img.resize((self.target_size[1], self.target_size[0]), interpolation)
             return np.array(resized)
     
     def _extract_bands(self, img, sat_type: str) -> np.ndarray:
@@ -293,6 +296,8 @@ class SatelliteDataset(Dataset):
             if label_path:
                 try:
                     labels = np.load(label_path)
+                    # Resize labels to match target dimensions using nearest neighbor
+                    labels = self._resize_image(labels, is_label=True)
                     label_tensor = torch.from_numpy(labels.astype(np.float32))
                 except Exception as e:
                     warnings.warn(f"Failed to load labels from {label_path}: {str(e)}")
