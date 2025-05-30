@@ -453,8 +453,9 @@ def collate_satellite_batch(batch: List[Dict]) -> Dict[str, Union[torch.Tensor, 
         'bands': bands
     }
     
-    # Stack labels if available
-    if 'labels' in batch[0]:
+    # Stack labels if available - only include if ALL items have labels
+    all_have_labels = all('labels' in item for item in batch)
+    if all_have_labels:
         labels = torch.stack([item['labels'] for item in batch])
         result['labels'] = labels
     
