@@ -236,6 +236,16 @@ class SatelliteDataset(Dataset):
         
         return image_data
     
+    def _apply_scaling(self, image_data: np.ndarray, img, sat_type: str) -> np.ndarray:
+        """Apply satellite-specific scaling to image data."""
+        if sat_type == 'sentinel2':
+            # Sentinel-2 scaling: divide by 10000 to get reflectance values
+            return image_data / 10000.0
+        else:
+            # Landsat scaling: typically already in reflectance or can use metadata
+            # For now, assume already scaled or apply simple normalization
+            return image_data / 65535.0  # Assuming 16-bit data
+    
     def _get_label_path(self, image_path: str) -> Optional[str]:
         """Find matching label file for the image."""
         if not self.labels_dir:
