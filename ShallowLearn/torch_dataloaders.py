@@ -54,10 +54,12 @@ class SatelliteDataset(Dataset):
                  landsat_paths: List[str] = None,
                  sentinel_dir: str = None,
                  landsat_dir: str = None,
+                 labels_dir: str = None,
                  target_size: Tuple[int, int] = (512, 512),
                  bands: List[str] = None,
                  transform: Optional[callable] = None,
-                 auto_find_common_bands: bool = True):
+                 auto_find_common_bands: bool = True,
+                 apply_scaling: bool = True):
         """
         Initialize the satellite dataset.
         
@@ -71,6 +73,8 @@ class SatelliteDataset(Dataset):
             Directory containing Sentinel-2 files (alternative to paths)
         landsat_dir : str, optional
             Directory containing Landsat files (alternative to paths)
+        labels_dir : str, optional
+            Directory containing pre-computed labels (.npy files) matching image filenames
         target_size : Tuple[int, int], default=(512, 512)
             Target image dimensions (height, width)
         bands : List[str], optional
@@ -79,11 +83,15 @@ class SatelliteDataset(Dataset):
             Additional transforms to apply
         auto_find_common_bands : bool, default=True
             Whether to automatically find common bands across all files
+        apply_scaling : bool, default=True
+            Whether to apply satellite-specific scaling (Sentinel-2: /10000, Landsat: metadata-based)
         """
         
         self.target_size = target_size
         self.transform = transform
         self.auto_find_common_bands = auto_find_common_bands
+        self.apply_scaling = apply_scaling
+        self.labels_dir = Path(labels_dir) if labels_dir else None
         
         # Collect file paths
         self.satellite_files = []
@@ -220,7 +228,29 @@ class SatelliteDataset(Dataset):
             else:
                 raise ValueError(f"Band {band_name} not available in {sat_type} image")
         
-        return np.stack(band_arrays, axis=2)
+        image_data = np.stack(band_arrays, axis=2)
+        
+        # Apply scaling if requested
+        if self.apply_scaling:
+            image_data = self._apply_scaling(image_data, img, sat_type)
+        
+        return image_data
+    
+    def _get_label_path(self, image_path: str) -> Optional[str]:
+        """Find matching label file for the image."""
+        if not self.labels_dir:
+            return None
+        
+        # Extract filename without extension
+        image_name = Path(image_path).stem
+        
+        # Look for matching .npy file
+        label_path = self.labels_dir / f"{image_name}.npy"
+        
+        if label_path.exists():
+            return str(label_path)
+        
+        return None
     
     def __len__(self) -> int:
         return len(self.satellite_files)
@@ -247,12 +277,27 @@ class SatelliteDataset(Dataset):
             if self.transform:
                 image_tensor = self.transform(image_tensor)
             
-            return {
+            # Load labels if available
+            label_tensor = None
+            label_path = self._get_label_path(file_path)
+            if label_path:
+                try:
+                    labels = np.load(label_path)
+                    label_tensor = torch.from_numpy(labels.astype(np.float32))
+                except Exception as e:
+                    warnings.warn(f"Failed to load labels from {label_path}: {str(e)}")
+            
+            result = {
                 'image': image_tensor,
                 'satellite_type': sat_type,
                 'file_path': file_path,
                 'bands': self.bands
             }
+            
+            if label_tensor is not None:
+                result['labels'] = label_tensor
+            
+            return result
             
         except Exception as e:
             # Re-raise the exception since we want to catch data issues early
@@ -301,6 +346,7 @@ def create_satellite_dataloader(
     landsat_dir: str = None,
     sentinel_paths: List[str] = None,
     landsat_paths: List[str] = None,
+    labels_dir: str = None,
     batch_size: int = 8,
     shuffle: bool = True,
     num_workers: int = 4,
@@ -322,6 +368,8 @@ def create_satellite_dataloader(
         List of Sentinel-2 file paths
     landsat_paths : List[str], optional
         List of Landsat file paths
+    labels_dir : str, optional
+        Directory containing pre-computed labels (.npy files)
     batch_size : int, default=8
         Batch size for the DataLoader
     shuffle : bool, default=True
@@ -348,6 +396,7 @@ def create_satellite_dataloader(
         landsat_paths=landsat_paths,
         sentinel_dir=sentinel_dir,
         landsat_dir=landsat_dir,
+        labels_dir=labels_dir,
         target_size=target_size,
         bands=bands,
         auto_find_common_bands=auto_find_common_bands,
@@ -387,9 +436,16 @@ def collate_satellite_batch(batch: List[Dict]) -> Dict[str, Union[torch.Tensor, 
     file_paths = [item['file_path'] for item in batch]
     bands = batch[0]['bands']  # Should be the same for all items
     
-    return {
+    result = {
         'images': images,
         'satellite_types': satellite_types,
         'file_paths': file_paths,
         'bands': bands
     }
+    
+    # Stack labels if available
+    if 'labels' in batch[0]:
+        labels = torch.stack([item['labels'] for item in batch])
+        result['labels'] = labels
+    
+    return result
