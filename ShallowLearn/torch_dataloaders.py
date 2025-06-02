@@ -58,6 +58,7 @@ class SatelliteDataset(Dataset):
                  target_size: Tuple[int, int] = (512, 512),
                  bands: List[str] = None,
                  transform: Optional[callable] = None,
+                 albumentations_transform: Optional[callable] = None,
                  auto_find_common_bands: bool = True,
                  apply_scaling: bool = True):
         """
@@ -80,7 +81,9 @@ class SatelliteDataset(Dataset):
         bands : List[str], optional
             Specific bands to use (Landsat nomenclature). If None, auto-discovers common bands
         transform : callable, optional
-            Additional transforms to apply
+            Additional PyTorch transforms to apply (applied after albumentations)
+        albumentations_transform : callable, optional
+            Albumentations transform pipeline for data augmentation (applied to numpy arrays)
         auto_find_common_bands : bool, default=True
             Whether to automatically find common bands across all files
         apply_scaling : bool, default=True
@@ -89,6 +92,7 @@ class SatelliteDataset(Dataset):
         
         self.target_size = target_size
         self.transform = transform
+        self.albumentations_transform = albumentations_transform
         self.auto_find_common_bands = auto_find_common_bands
         self.apply_scaling = apply_scaling
         self.labels_dir = Path(labels_dir) if labels_dir else None
@@ -282,25 +286,45 @@ class SatelliteDataset(Dataset):
             # Resize to target dimensions
             image_data = self._resize_image(image_data)
             
-            # Convert to torch tensor and rearrange dimensions (H, W, C) -> (C, H, W)
-            image_tensor = torch.from_numpy(image_data.astype(np.float32))
-            image_tensor = image_tensor.permute(2, 0, 1)  # (C, H, W)
-            
-            # Apply additional transforms if provided
-            if self.transform:
-                image_tensor = self.transform(image_tensor)
-            
             # Load labels if available
-            label_tensor = None
+            labels = None
             label_path = self._get_label_path(file_path)
             if label_path:
                 try:
                     labels = np.load(label_path)
                     # Resize labels to match target dimensions using nearest neighbor
                     labels = self._resize_image(labels, is_label=True)
-                    label_tensor = torch.from_numpy(labels.astype(np.float32))
                 except Exception as e:
                     warnings.warn(f"Failed to load labels from {label_path}: {str(e)}")
+                    labels = None
+            
+            # Apply albumentations transforms if provided (works on numpy arrays)
+            if self.albumentations_transform:
+                if labels is not None:
+                    # Apply augmentation to both image and mask
+                    augmented = self.albumentations_transform(
+                        image=image_data.astype(np.float32),
+                        mask=labels.astype(np.float32)
+                    )
+                    image_data = augmented['image']
+                    labels = augmented['mask']
+                else:
+                    # Apply augmentation to image only
+                    augmented = self.albumentations_transform(image=image_data.astype(np.float32))
+                    image_data = augmented['image']
+            
+            # Convert to torch tensor and rearrange dimensions (H, W, C) -> (C, H, W)
+            image_tensor = torch.from_numpy(image_data.astype(np.float32))
+            image_tensor = image_tensor.permute(2, 0, 1)  # (C, H, W)
+            
+            # Convert labels to tensor if available
+            label_tensor = None
+            if labels is not None:
+                label_tensor = torch.from_numpy(labels.astype(np.float32))
+            
+            # Apply additional PyTorch transforms if provided (applied after albumentations)
+            if self.transform:
+                image_tensor = self.transform(image_tensor)
             
             result = {
                 'image': image_tensor,
@@ -368,6 +392,7 @@ def create_satellite_dataloader(
     target_size: Tuple[int, int] = (512, 512),
     bands: List[str] = None,
     auto_find_common_bands: bool = True,
+    albumentations_transform: Optional[callable] = None,
     **dataset_kwargs
 ) -> DataLoader:
     """
@@ -397,6 +422,8 @@ def create_satellite_dataloader(
         Specific bands to use (if None, auto-discovers common bands)
     auto_find_common_bands : bool, default=True
         Whether to automatically find common bands across all files
+    albumentations_transform : callable, optional
+        Albumentations transform pipeline for data augmentation
     **dataset_kwargs
         Additional arguments for SatelliteDataset
     
@@ -415,6 +442,7 @@ def create_satellite_dataloader(
         target_size=target_size,
         bands=bands,
         auto_find_common_bands=auto_find_common_bands,
+        albumentations_transform=albumentations_transform,
         **dataset_kwargs
     )
     
