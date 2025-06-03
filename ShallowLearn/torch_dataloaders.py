@@ -106,7 +106,7 @@ class SatelliteDataset(Dataset):
                 self.satellite_files.append(('sentinel2', path))
         elif sentinel_dir:
             sentinel_dir = Path(sentinel_dir)
-            for vrt_file in sentinel_dir.glob("*.vrt"):
+            for vrt_file in sorted(sentinel_dir.glob("*.vrt")):
                 if any(sat in vrt_file.name.upper() for sat in ["S2A", "S2B"]):
                     self.satellite_files.append(('sentinel2', str(vrt_file)))
         
@@ -116,7 +116,7 @@ class SatelliteDataset(Dataset):
                 self.satellite_files.append(('landsat', path))
         elif landsat_dir:
             landsat_dir = Path(landsat_dir)
-            for vrt_file in landsat_dir.glob("*.vrt"):
+            for vrt_file in sorted(landsat_dir.glob("*.vrt")):
                 if any(sat in vrt_file.name.upper() for sat in ["LC08", "LC09", "LE07", "LT05", "LT04"]):
                     self.satellite_files.append(('landsat', str(vrt_file)))
         
