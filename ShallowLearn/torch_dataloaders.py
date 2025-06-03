@@ -222,7 +222,7 @@ class SatelliteDataset(Dataset):
             resized = pil_img.resize((self.target_size[1], self.target_size[0]), interpolation)
             return np.array(resized)
     
-    def _extract_bands(self, img, sat_type: str) -> np.ndarray:
+    def _extract_bands(self, img, sat_type: str, file_path: str) -> np.ndarray:
         """Extract and align requested bands from satellite image (only existing bands, no NaNs)."""
         band_arrays = []
         unified_bands = self._get_unified_bands(img, sat_type)
@@ -251,7 +251,7 @@ class SatelliteDataset(Dataset):
         
         # Apply scaling if requested
         if self.apply_scaling:
-            image_data = self._apply_scaling(image_data, img, sat_type)
+            image_data = self._apply_scaling(image_data, img, sat_type, file_path)
         
         # Apply outlier clipping if requested
         if self.clip_outliers:
@@ -263,15 +263,27 @@ class SatelliteDataset(Dataset):
         
         return image_data
     
-    def _apply_scaling(self, image_data: np.ndarray, img, sat_type: str) -> np.ndarray:
+    def _apply_scaling(self, image_data: np.ndarray, img, sat_type: str, file_path: str) -> np.ndarray:
         """Apply satellite-specific scaling to image data."""
         if sat_type == 'sentinel2':
             # Sentinel-2 scaling: divide by 10000 to get reflectance values
             return image_data / 10000.0
         else:
-            # Landsat scaling: typically already in reflectance or can use metadata
-            # For now, assume already scaled or apply simple normalization
-            return image_data / 65535.0  # Assuming 16-bit data
+            # Landsat scaling: depends on satellite generation
+            # Extract satellite identifier from filename
+            filename = Path(file_path).name.upper()
+            
+            # Determine scaling based on satellite generation
+            if any(sat in filename for sat in ['LC08', 'LC09', 'LO08', 'LO09']):
+                # Landsat 8/9: 16-bit data (0-65535)
+                return image_data / 65535.0
+            elif any(sat in filename for sat in ['LT04', 'LT05', 'LE07']):
+                # Landsat 4/5/7: 8-bit data (0-255) for the bands we use
+                return image_data / 255.0
+            else:
+                # Fallback: assume 16-bit (safer assumption)
+                print(f"Warning: Unknown Landsat satellite in {filename}, assuming 16-bit scaling")
+                return image_data / 65535.0
     
     def _clip_outliers(self, image_data: np.ndarray) -> np.ndarray:
         """Clip outlier values using percentiles per band."""
@@ -344,7 +356,7 @@ class SatelliteDataset(Dataset):
             img = create_satellite_image(file_path)
             
             # Extract and align bands
-            image_data = self._extract_bands(img, sat_type)
+            image_data = self._extract_bands(img, sat_type, file_path)
             
             # Resize to target dimensions
             image_data = self._resize_image(image_data)
