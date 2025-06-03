@@ -60,7 +60,10 @@ class SatelliteDataset(Dataset):
                  transform: Optional[callable] = None,
                  albumentations_transform: Optional[callable] = None,
                  auto_find_common_bands: bool = True,
-                 apply_scaling: bool = True):
+                 apply_scaling: bool = True,
+                 normalize_per_image: bool = False,
+                 clip_outliers: bool = False,
+                 outlier_percentiles: Tuple[float, float] = (2.0, 98.0)):
         """
         Initialize the satellite dataset.
         
@@ -88,6 +91,12 @@ class SatelliteDataset(Dataset):
             Whether to automatically find common bands across all files
         apply_scaling : bool, default=True
             Whether to apply satellite-specific scaling (Sentinel-2: /10000, Landsat: metadata-based)
+        normalize_per_image : bool, default=False
+            Whether to apply min-max normalization per image (0-1 scaling)
+        clip_outliers : bool, default=False
+            Whether to clip outlier values using percentiles
+        outlier_percentiles : Tuple[float, float], default=(2.0, 98.0)
+            Percentile values for outlier clipping (lower, upper)
         """
         
         self.target_size = target_size
@@ -95,6 +104,9 @@ class SatelliteDataset(Dataset):
         self.albumentations_transform = albumentations_transform
         self.auto_find_common_bands = auto_find_common_bands
         self.apply_scaling = apply_scaling
+        self.normalize_per_image = normalize_per_image
+        self.clip_outliers = clip_outliers
+        self.outlier_percentiles = outlier_percentiles
         self.labels_dir = Path(labels_dir) if labels_dir else None
         
         # Collect file paths
@@ -241,6 +253,14 @@ class SatelliteDataset(Dataset):
         if self.apply_scaling:
             image_data = self._apply_scaling(image_data, img, sat_type)
         
+        # Apply outlier clipping if requested
+        if self.clip_outliers:
+            image_data = self._clip_outliers(image_data)
+        
+        # Apply per-image normalization if requested
+        if self.normalize_per_image:
+            image_data = self._normalize_per_image(image_data)
+        
         return image_data
     
     def _apply_scaling(self, image_data: np.ndarray, img, sat_type: str) -> np.ndarray:
@@ -252,6 +272,49 @@ class SatelliteDataset(Dataset):
             # Landsat scaling: typically already in reflectance or can use metadata
             # For now, assume already scaled or apply simple normalization
             return image_data / 65535.0  # Assuming 16-bit data
+    
+    def _clip_outliers(self, image_data: np.ndarray) -> np.ndarray:
+        """Clip outlier values using percentiles per band."""
+        clipped_data = image_data.copy()
+        
+        # Apply clipping per band
+        for band_idx in range(image_data.shape[2]):
+            band_data = image_data[:, :, band_idx]
+            
+            # Calculate percentiles, ignoring NaN values
+            valid_mask = ~np.isnan(band_data)
+            if np.any(valid_mask):
+                lower_percentile, upper_percentile = self.outlier_percentiles
+                lower_bound = np.percentile(band_data[valid_mask], lower_percentile)
+                upper_bound = np.percentile(band_data[valid_mask], upper_percentile)
+                
+                # Clip values
+                clipped_data[:, :, band_idx] = np.clip(band_data, lower_bound, upper_bound)
+        
+        return clipped_data
+    
+    def _normalize_per_image(self, image_data: np.ndarray) -> np.ndarray:
+        """Apply min-max normalization per image per band."""
+        normalized_data = image_data.copy()
+        
+        # Normalize each band independently
+        for band_idx in range(image_data.shape[2]):
+            band_data = image_data[:, :, band_idx]
+            
+            # Calculate min/max, ignoring NaN values
+            valid_mask = ~np.isnan(band_data)
+            if np.any(valid_mask):
+                band_min = np.min(band_data[valid_mask])
+                band_max = np.max(band_data[valid_mask])
+                
+                # Avoid division by zero
+                if band_max > band_min:
+                    normalized_data[:, :, band_idx] = (band_data - band_min) / (band_max - band_min)
+                else:
+                    # If all values are the same, set to 0
+                    normalized_data[:, :, band_idx] = 0.0
+        
+        return normalized_data
     
     def _get_label_path(self, image_path: str) -> Optional[str]:
         """Find matching label file for the image."""
@@ -393,6 +456,9 @@ def create_satellite_dataloader(
     bands: List[str] = None,
     auto_find_common_bands: bool = True,
     albumentations_transform: Optional[callable] = None,
+    normalize_per_image: bool = False,
+    clip_outliers: bool = False,
+    outlier_percentiles: Tuple[float, float] = (2.0, 98.0),
     **dataset_kwargs
 ) -> DataLoader:
     """
@@ -424,6 +490,12 @@ def create_satellite_dataloader(
         Whether to automatically find common bands across all files
     albumentations_transform : callable, optional
         Albumentations transform pipeline for data augmentation
+    normalize_per_image : bool, default=False
+        Whether to apply min-max normalization per image (0-1 scaling)
+    clip_outliers : bool, default=False
+        Whether to clip outlier values using percentiles
+    outlier_percentiles : Tuple[float, float], default=(2.0, 98.0)
+        Percentile values for outlier clipping (lower, upper)
     **dataset_kwargs
         Additional arguments for SatelliteDataset
     
@@ -443,6 +515,9 @@ def create_satellite_dataloader(
         bands=bands,
         auto_find_common_bands=auto_find_common_bands,
         albumentations_transform=albumentations_transform,
+        normalize_per_image=normalize_per_image,
+        clip_outliers=clip_outliers,
+        outlier_percentiles=outlier_percentiles,
         **dataset_kwargs
     )
     
