@@ -31,22 +31,18 @@ class LabelInspector:
         self.current_idx = 0
         self.dataset_size = len(dataloader.dataset)
         
-        # Track decisions for each file
+        # Track decisions for each file (lazy loading)
         self.decisions = {}  # {file_path: {'status': 'train/val/skip', 'notes': ''}}
+        self.file_paths = []  # Cache file paths for navigation
         
-        # Load samples
-        self.samples = []
-        print("Loading dataset samples...")
+        # Initialize file paths for decision tracking (lightweight)
+        print("Initializing file paths...")
         for i in range(self.dataset_size):
-            try:
-                sample = dataloader.dataset[i]
-                self.samples.append(sample)
-                # Initialize decision tracking
-                self.decisions[sample['file_path']] = {'status': 'undecided', 'notes': ''}
-            except Exception as e:
-                print(f"Error loading sample {i}: {e}")
-                continue
-        print(f"Loaded {len(self.samples)} samples")
+            # Get file path from dataset's satellite_files list (no loading)
+            sat_type, file_path = dataloader.dataset.satellite_files[i]
+            self.file_paths.append(file_path)
+            self.decisions[file_path] = {'status': 'undecided', 'notes': ''}
+        print(f"Ready to inspect {len(self.file_paths)} samples")
         
         self.setup_widgets()
     
@@ -54,7 +50,7 @@ class LabelInspector:
         """Setup interactive widgets."""
         # Navigation
         self.idx_slider = widgets.IntSlider(
-            value=0, min=0, max=len(self.samples) - 1,
+            value=0, min=0, max=self.dataset_size - 1,
             description='Sample:', layout=widgets.Layout(width='400px')
         )
         
@@ -129,13 +125,12 @@ class LabelInspector:
     def change_index(self, delta):
         """Change index by delta."""
         self.save_current_notes()
-        new_idx = max(0, min(len(self.samples) - 1, self.current_idx + delta))
+        new_idx = max(0, min(self.dataset_size - 1, self.current_idx + delta))
         self.idx_slider.value = new_idx
     
     def mark_sample(self, status):
         """Mark current sample with given status."""
-        sample = self.samples[self.current_idx]
-        file_path = sample['file_path']
+        file_path = self.file_paths[self.current_idx]
         
         # Update decision
         self.decisions[file_path]['status'] = status
@@ -145,7 +140,7 @@ class LabelInspector:
         self.update_button_styles(status)
         
         # Auto-advance to next sample
-        if self.current_idx < len(self.samples) - 1:
+        if self.current_idx < self.dataset_size - 1:
             self.change_index(1)
         
         self.update_status_display()
@@ -172,19 +167,31 @@ class LabelInspector:
     
     def save_current_notes(self):
         """Save current notes for the current sample."""
-        if self.samples:
-            sample = self.samples[self.current_idx]
-            file_path = sample['file_path']
+        if self.file_paths and self.current_idx < len(self.file_paths):
+            file_path = self.file_paths[self.current_idx]
             self.decisions[file_path]['notes'] = self.notes_text.value
     
     def show_sample(self):
         """Display current sample."""
-        if not self.samples:
+        if not self.file_paths:
             return
         
-        sample = self.samples[self.current_idx]
-        image = sample['image']  # Shape: (C, H, W)
-        file_path = sample['file_path']
+        # Load sample on-demand (lazy loading)
+        try:
+            print(f"Loading sample {self.current_idx + 1}/{self.dataset_size}...")
+            sample = self.dataloader.dataset[self.current_idx]
+            image = sample['image']  # Shape: (C, H, W)
+            file_path = sample['file_path']
+        except Exception as e:
+            print(f"Error loading sample {self.current_idx}: {e}")
+            # Show error and allow user to skip
+            plt.figure(figsize=(8, 4))
+            plt.text(0.5, 0.5, f'Error loading sample {self.current_idx}\n{str(e)}', 
+                    ha='center', va='center', fontsize=12, color='red')
+            plt.title(f'Sample {self.current_idx + 1}/{self.dataset_size} - ERROR')
+            plt.axis('off')
+            plt.show()
+            return
         
         # Clear previous plot
         plt.close('all')
@@ -270,11 +277,11 @@ class LabelInspector:
                 counts[decision['status']] += 1
             
             # Current sample info
-            sample = self.samples[self.current_idx]
-            current_status = self.decisions[sample['file_path']]['status']
+            file_path = self.file_paths[self.current_idx]
+            current_status = self.decisions[file_path]['status']
             
-            print(f"📊 Progress: {self.current_idx + 1}/{len(self.samples)}")
-            print(f"📁 Current: {Path(sample['file_path']).name}")
+            print(f"📊 Progress: {self.current_idx + 1}/{self.dataset_size}")
+            print(f"📁 Current: {Path(file_path).name}")
             print(f"🏷️  Status: {current_status}")
             print(f"🔢 Summary - Train: {counts['train']}, Val: {counts['validation']}, Skip: {counts['skip']}, Undecided: {counts['undecided']}")
     
@@ -282,17 +289,23 @@ class LabelInspector:
         """Export decisions to CSV."""
         # Prepare data
         data = []
-        for sample in self.samples:
-            file_path = sample['file_path']
+        for i, file_path in enumerate(self.file_paths):
             decision = self.decisions[file_path]
+            
+            # Determine satellite type from filename
+            filename = Path(file_path).name.upper()
+            if any(sat in filename for sat in ["S2A", "S2B"]):
+                sat_type = 'sentinel2'
+            else:
+                sat_type = 'landsat'
             
             data.append({
                 'file_path': file_path,
                 'filename': Path(file_path).name,
-                'satellite_type': sample['satellite_type'],
+                'satellite_type': sat_type,
                 'status': decision['status'],
                 'notes': decision['notes'],
-                'bands': str(sample['bands'])
+                'bands': str(self.dataloader.dataset.bands)
             })
         
         # Create DataFrame and save
