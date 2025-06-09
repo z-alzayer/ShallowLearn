@@ -92,6 +92,17 @@ class LabelInspector:
     
     def display_interface(self):
         """Display the inspection interface."""
+        print("🔧 Setting up interface...")
+        
+        # Test if widgets work
+        try:
+            test_widget = widgets.HTML("Testing widgets...")
+            display(test_widget)
+            print("✅ Basic widget display works")
+        except Exception as e:
+            print(f"❌ Widget error: {e}")
+            return
+        
         # Navigation controls
         nav_box = widgets.HBox([self.prev_btn, self.idx_slider, self.next_btn])
         
@@ -113,7 +124,10 @@ class LabelInspector:
             self.status_output
         ])
         
+        print("🎛️ Displaying control panel...")
         display(control_panel)
+        
+        print("📊 Loading first sample...")
         self.show_sample()
     
     def on_index_change(self, change):
