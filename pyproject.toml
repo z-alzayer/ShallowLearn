@@ -27,7 +27,8 @@ keywords = ["remote sensing", "satellite imagery", "machine learning", "coral re
 requires-python = ">=3.10"
 
 # Core dependencies
-# Note: GDAL requires system libraries - install with: sudo apt install gdal-bin libgdal-dev
+# Note: GDAL is not listed here as it requires system GDAL version matching
+# Install GDAL separately: pip install gdal==$(gdal-config --version)
 dependencies = [
     "numpy>=1.25.0,<2.0",
     "pandas>=2.0.0",
@@ -41,7 +42,6 @@ dependencies = [
     "tqdm>=4.64.0",
     "seaborn>=0.12.0",
     "pillow>=9.5.0",
-    "gdal>=3.6.0,<4.0.0",  # Version depends on system GDAL
     "cdsetool",
 ]
 
