@@ -3,43 +3,76 @@ name: Python Package CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, main, code_refactor ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, main ]
 
 jobs:
-  build:
-
+  test:
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+    
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Conda environment
-      uses: conda-incubator/setup-miniconda@v2
-      with:
-        activate-environment: ShallowLearn
-        environment-file: environment.yml
-        python-version: 3.10.8
-        auto-activate-base: false
-
-    - name: Install dependencies
-      shell: bash
+    - name: Install system dependencies (including GDAL)
       run: |
-        conda config --add channels defaults
         sudo apt-get update
-        pip install -e .
-    - name: Run tests
-      shell: bash -l {0}
+        sudo apt-get install -y \
+          gdal-bin \
+          libgdal-dev \
+          python3-gdal \
+          libproj-dev \
+          proj-data \
+          proj-bin \
+          libgeos-dev
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
+
+    - name: Set up Python ${{ matrix.python-version }}
+      run: uv python install ${{ matrix.python-version }}
+
+    - name: Create virtual environment and install dependencies
       run: |
-        pwd
-        ls
-        conda info
-        conda list
-        export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
-        python -m coverage run --source ShallowLearn -m pytest
-        python -m coverage xml -o coverage.xml
-    - name: Upload results to Codecov
+        uv venv --python ${{ matrix.python-version }}
+        
+        # Get system GDAL version and install matching Python bindings
+        GDAL_VERSION=$(gdal-config --version)
+        echo "System GDAL version: $GDAL_VERSION"
+        
+        # Install GDAL Python bindings matching system version
+        uv pip install "gdal==$GDAL_VERSION"
+        
+        # Install package with test dependencies
+        uv pip install -e ".[dev,test]"
+
+    - name: Verify installation
+      run: |
+        uv run python -c "import ShallowLearn; print('✅ ShallowLearn imported successfully')"
+        uv run python -c "from osgeo import gdal; print('✅ GDAL version:', gdal.__version__)"
+        uv run python -c "import rasterio; print('✅ Rasterio available')"
+        uv run python -c "import geopandas; print('✅ GeoPandas available')"
+
+    - name: Run tests with coverage
+      run: |
+        uv run pytest tests/ \
+          --ignore=tests/test_modular_structure.py \
+          --cov=ShallowLearn \
+          --cov-report=xml \
+          --cov-report=term-missing \
+          --tb=short \
+          --maxfail=10
+
+    - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false

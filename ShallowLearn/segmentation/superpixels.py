@@ -2,32 +2,34 @@
 Image segmentation utilities for superpixel generation.
 Clean implementation without redundant code.
 """
+
+import warnings
+from typing import List, Optional, Tuple, Union
+
 import numpy as np
-from skimage.segmentation import (
-    felzenszwalb, slic, quickshift, watershed
-)
 from skimage.filters import threshold_multiotsu
-from sklearn.decomposition import PCA
+from skimage.segmentation import felzenszwalb, quickshift, slic, watershed
 from sklearn.cluster import DBSCAN
+from sklearn.decomposition import PCA
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import MinMaxScaler
-from typing import Tuple, List, Optional, Union
-import warnings
 
 # Import StandardDII for depth invariant calculations
 try:
-    from ..StandardDII import calculate_slope_from_values, apply_depth_invariant_index
+    from ..StandardDII import apply_depth_invariant_index, calculate_slope_from_values
 except ImportError:
-    from ShallowLearn.StandardDII import calculate_slope_from_values, apply_depth_invariant_index
+    from ShallowLearn.StandardDII import (
+        apply_depth_invariant_index,
+        calculate_slope_from_values,
+    )
 
 # Suppress sklearn warnings
-warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
-def felzenszwalb_segmentation(image: np.ndarray, 
-                            scale: float = 100, 
-                            sigma: float = 0.5, 
-                            min_size: int = 50) -> np.ndarray:
+def felzenszwalb_segmentation(
+    image: np.ndarray, scale: float = 100, sigma: float = 0.5, min_size: int = 50
+) -> np.ndarray:
     """
     Performs Felzenszwalb segmentation on an image.
 
@@ -50,11 +52,13 @@ def felzenszwalb_segmentation(image: np.ndarray,
     return felzenszwalb(image, scale=scale, sigma=sigma, min_size=min_size)
 
 
-def slic_segmentation(image: np.ndarray, 
-                     n_segments: int = 1000, 
-                     compactness: float = 10, 
-                     sigma: float = 1,
-                     start_label: int = 1) -> np.ndarray:
+def slic_segmentation(
+    image: np.ndarray,
+    n_segments: int = 1000,
+    compactness: float = 10,
+    sigma: float = 1,
+    start_label: int = 1,
+) -> np.ndarray:
     """
     Performs SLIC (Simple Linear Iterative Clustering) segmentation.
 
@@ -76,14 +80,18 @@ def slic_segmentation(image: np.ndarray,
     np.ndarray
         Segmentation labels
     """
-    return slic(image, n_segments=n_segments, compactness=compactness, 
-                sigma=sigma, start_label=start_label)
+    return slic(
+        image,
+        n_segments=n_segments,
+        compactness=compactness,
+        sigma=sigma,
+        start_label=start_label,
+    )
 
 
-def quickshift_segmentation(image: np.ndarray, 
-                          kernel_size: float = 3, 
-                          max_dist: float = 6, 
-                          ratio: float = 0.5) -> np.ndarray:
+def quickshift_segmentation(
+    image: np.ndarray, kernel_size: float = 3, max_dist: float = 6, ratio: float = 0.5
+) -> np.ndarray:
     """
     Performs quickshift segmentation.
 
@@ -106,9 +114,9 @@ def quickshift_segmentation(image: np.ndarray,
     return quickshift(image, kernel_size=kernel_size, max_dist=max_dist, ratio=ratio)
 
 
-def watershed_segmentation(image: np.ndarray, 
-                         markers: Optional[np.ndarray] = None,
-                         connectivity: int = 1) -> np.ndarray:
+def watershed_segmentation(
+    image: np.ndarray, markers: Optional[np.ndarray] = None, connectivity: int = 1
+) -> np.ndarray:
     """
     Performs watershed segmentation.
 
@@ -129,17 +137,18 @@ def watershed_segmentation(image: np.ndarray,
     if markers is None:
         # Use gradient for watershed if no markers provided
         from skimage.filters import sobel
+
         elevation_map = sobel(image)
         markers = np.zeros_like(elevation_map, dtype=int)
         markers[elevation_map < 0.1] = 1
         markers[elevation_map > 0.8] = 2
-    
+
     return watershed(image, markers, connectivity=connectivity)
 
 
-def multiotsu_thresholding(image: np.ndarray, 
-                          classes: int = 3,
-                          nbins: int = 256) -> Tuple[np.ndarray, np.ndarray]:
+def multiotsu_thresholding(
+    image: np.ndarray, classes: int = 3, nbins: int = 256
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Applies multi-Otsu thresholding to generate multiple classes.
 
@@ -160,16 +169,16 @@ def multiotsu_thresholding(image: np.ndarray,
     # Convert to grayscale if needed
     if len(image.shape) == 3:
         image = np.mean(image, axis=2)
-    
+
     thresholds = threshold_multiotsu(image, classes=classes, nbins=nbins)
     segmented = np.digitize(image, bins=thresholds)
-    
+
     return thresholds, segmented
 
 
-def extract_patches(image: np.ndarray, 
-                   segments: np.ndarray,
-                   min_size: int = 10) -> List[np.ndarray]:
+def extract_patches(
+    image: np.ndarray, segments: np.ndarray, min_size: int = 10
+) -> List[np.ndarray]:
     """
     Extracts patches from image based on segmentation labels.
 
@@ -189,20 +198,20 @@ def extract_patches(image: np.ndarray,
     """
     patches = []
     unique_labels = np.unique(segments)
-    
+
     for label in unique_labels:
         if label == 0:  # Skip background
             continue
-            
+
         mask = segments == label
         if np.sum(mask) < min_size:
             continue
-            
+
         # Find bounding box
         rows, cols = np.where(mask)
         min_row, max_row = np.min(rows), np.max(rows) + 1
         min_col, max_col = np.min(cols), np.max(cols) + 1
-        
+
         # Extract patch
         patch_mask = mask[min_row:max_row, min_col:max_col]
         if len(image.shape) == 3:
@@ -211,15 +220,15 @@ def extract_patches(image: np.ndarray,
         else:
             patch = image[min_row:max_row, min_col:max_col]
             patch = patch * patch_mask
-            
+
         patches.append(patch)
-    
+
     return patches
 
 
-def pca_segments(patches: List[np.ndarray], 
-                n_components: int = 5,
-                return_transformer: bool = False) -> Union[np.ndarray, Tuple[np.ndarray, PCA]]:
+def pca_segments(
+    patches: List[np.ndarray], n_components: int = 5, return_transformer: bool = False
+) -> Union[np.ndarray, Tuple[np.ndarray, PCA]]:
     """
     Applies PCA to flattened patches.
 
@@ -244,33 +253,35 @@ def pca_segments(patches: List[np.ndarray],
             flattened = patch.reshape(-1, patch.shape[2])
         else:
             flattened = patch.reshape(-1, 1)
-        
+
         # Remove zero pixels
         non_zero_mask = np.any(flattened != 0, axis=1)
         if np.sum(non_zero_mask) > 0:
             flattened_patches.append(flattened[non_zero_mask])
-    
+
     if not flattened_patches:
         if return_transformer:
             return np.array([]), None
         return np.array([])
-    
+
     # Concatenate all patches
     all_pixels = np.vstack(flattened_patches)
-    
+
     # Apply PCA
     pca = PCA(n_components=min(n_components, all_pixels.shape[1]))
     transformed = pca.fit_transform(all_pixels)
-    
+
     if return_transformer:
         return transformed, pca
     return transformed
 
 
-def cluster_segments(features: np.ndarray, 
-                    eps: float = 0.5, 
-                    min_samples: int = 5,
-                    algorithm: str = 'auto') -> np.ndarray:
+def cluster_segments(
+    features: np.ndarray,
+    eps: float = 0.5,
+    min_samples: int = 5,
+    algorithm: str = "auto",
+) -> np.ndarray:
     """
     Clusters features using DBSCAN.
 
@@ -292,16 +303,16 @@ def cluster_segments(features: np.ndarray,
     """
     if features.size == 0:
         return np.array([])
-    
+
     clustering = DBSCAN(eps=eps, min_samples=min_samples, algorithm=algorithm)
     labels = clustering.fit_predict(features)
-    
+
     return labels
 
 
-def scale_features(features: np.ndarray, 
-                  method: str = 'minmax',
-                  return_scaler: bool = False) -> Union[np.ndarray, Tuple[np.ndarray, MinMaxScaler]]:
+def scale_features(
+    features: np.ndarray, method: str = "minmax", return_scaler: bool = False
+) -> Union[np.ndarray, Tuple[np.ndarray, MinMaxScaler]]:
     """
     Scales features using various methods.
 
@@ -323,31 +334,36 @@ def scale_features(features: np.ndarray,
         if return_scaler:
             return features, None
         return features
-    
-    if method == 'minmax':
+
+    if method == "minmax":
         from sklearn.preprocessing import MinMaxScaler
+
         scaler = MinMaxScaler()
-    elif method == 'standard':
+    elif method == "standard":
         from sklearn.preprocessing import StandardScaler
+
         scaler = StandardScaler()
-    elif method == 'robust':
+    elif method == "robust":
         from sklearn.preprocessing import RobustScaler
+
         scaler = RobustScaler()
     else:
         raise ValueError(f"Unknown scaling method: {method}")
-    
+
     scaled = scaler.fit_transform(features)
-    
+
     if return_scaler:
         return scaled, scaler
     return scaled
 
 
-def extract_dii(image: np.ndarray, 
-               clusters: np.ndarray,
-               segments: np.ndarray,
-               patches: List[np.ndarray] = None,
-               method: str = 'mean') -> dict:
+def extract_dii(
+    image: np.ndarray,
+    clusters: np.ndarray,
+    segments: np.ndarray,
+    patches: List[np.ndarray] = None,
+    method: str = "mean",
+) -> dict:
     """
     Extracts Digital Intertidal Index (DII) from clustered segments.
 
@@ -371,18 +387,18 @@ def extract_dii(image: np.ndarray,
     """
     dii_results = {}
     unique_clusters = np.unique(clusters)
-    
+
     # If no patches provided, extract them from segments
     if patches is None:
         patches = extract_patches(image, segments)
-    
+
     # Ensure clusters array matches patches length
     if len(clusters) != len(patches):
         # If mismatch, compute DII directly from segments
         for cluster_id in unique_clusters:
             if cluster_id == -1:  # Skip noise cluster
                 continue
-                
+
             # Get representative segment for this cluster
             segment_id = cluster_id + 1  # Simple mapping
             if segment_id in np.unique(segments):
@@ -391,27 +407,29 @@ def extract_dii(image: np.ndarray,
                     pixels = image[seg_mask]
                 else:
                     pixels = image[seg_mask].reshape(-1, 1)
-                
+
                 if len(pixels) > 0:
-                    if method == 'mean':
+                    if method == "mean":
                         dii_value = np.mean(pixels, axis=0)
-                    elif method == 'median':
+                    elif method == "median":
                         dii_value = np.median(pixels, axis=0)
-                    elif method == 'std':
+                    elif method == "std":
                         dii_value = np.std(pixels, axis=0)
                     else:
                         raise ValueError(f"Unknown aggregation method: {method}")
-                    
+
                     dii_results[cluster_id] = dii_value
     else:
         # Use patch-based approach
         for cluster_id in unique_clusters:
             if cluster_id == -1:  # Skip noise cluster
                 continue
-                
+
             cluster_mask = clusters == cluster_id
-            cluster_patches = [patches[i] for i in range(len(patches)) if cluster_mask[i]]
-            
+            cluster_patches = [
+                patches[i] for i in range(len(patches)) if cluster_mask[i]
+            ]
+
             if cluster_patches:
                 # Extract non-zero pixels from patches
                 cluster_pixels = []
@@ -420,37 +438,44 @@ def extract_dii(image: np.ndarray,
                         pixels = patch.reshape(-1, patch.shape[2])
                     else:
                         pixels = patch.reshape(-1, 1)
-                    
+
                     # Remove zero pixels
-                    non_zero_mask = np.any(pixels != 0, axis=1) if len(pixels.shape) > 1 else pixels != 0
+                    non_zero_mask = (
+                        np.any(pixels != 0, axis=1)
+                        if len(pixels.shape) > 1
+                        else pixels != 0
+                    )
                     if np.sum(non_zero_mask) > 0:
                         cluster_pixels.append(pixels[non_zero_mask])
-                
+
                 if cluster_pixels:
                     all_pixels = np.vstack(cluster_pixels)
-                    
-                    if method == 'mean':
+
+                    if method == "mean":
                         dii_value = np.mean(all_pixels, axis=0)
-                    elif method == 'median':
+                    elif method == "median":
                         dii_value = np.median(all_pixels, axis=0)
-                    elif method == 'std':
+                    elif method == "std":
                         dii_value = np.std(all_pixels, axis=0)
                     else:
                         raise ValueError(f"Unknown aggregation method: {method}")
-                        
+
                     dii_results[cluster_id] = dii_value
-    
+
     return dii_results
 
 
-def create_superpixel_dii_stack(image: np.ndarray,
-                               n_segments: int = 110,
-                               bands: List[int] = [0, 1, 2],
-                               correction_factor: int = 10,
-                               segmentation_method: str = 'slic') -> Tuple[np.ndarray, np.ndarray, dict]:
+def create_superpixel_dii_stack(
+    image: np.ndarray,
+    n_segments: int = 110,
+    bands: List[int] = [0, 1, 2],
+    correction_factor: int = 10,
+    segmentation_method: str = "slic",
+    band_combos=None,
+) -> Tuple[np.ndarray, np.ndarray, dict]:
     """
     Create superpixels and generate DII stack following StandardDII methodology.
-    
+
     Parameters:
     -----------
     image : np.ndarray
@@ -463,36 +488,42 @@ def create_superpixel_dii_stack(image: np.ndarray,
         Compactness factor for SLIC segmentation
     segmentation_method : str, default='slic'
         Segmentation method to use
-    
+
     Returns:
     --------
     Tuple[np.ndarray, np.ndarray, dict]
         (features, segments, results_dict)
     """
     # Create superpixel segmentation
-    if segmentation_method == 'slic':
-        segments = slic_segmentation(image, n_segments=n_segments, compactness=correction_factor)
-    elif segmentation_method == 'felzenszwalb':
+    if segmentation_method == "slic":
+        segments = slic_segmentation(
+            image, n_segments=n_segments, compactness=correction_factor
+        )
+    elif segmentation_method == "felzenszwalb":
         segments = felzenszwalb_segmentation(image)
-    elif segmentation_method == 'quickshift':
+    elif segmentation_method == "quickshift":
         segments = quickshift_segmentation(image)
     else:
         raise ValueError(f"Unknown segmentation method: {segmentation_method}")
-    
+
     # Process with DII pipeline
-    results = process_superpixel_dii_pipeline(image, segments, bands=bands)
-    
+    results = process_superpixel_dii_pipeline(
+        image, segments, bands=bands, band_combos=band_combos
+    )
+
     # Extract features (mean values for each superpixel)
-    features = results['features']
-    
+    features = results["features"]
+
     return features, segments, results
 
 
-def process_superpixel_dii_pipeline(image: np.ndarray,
-                                   segments: np.ndarray,
-                                   bands: List[int] = [0, 1, 2],
-                                   n_components: int = 3,
-                                   band_combos: List[Tuple[int, int]] = None) -> dict:
+def process_superpixel_dii_pipeline(
+    image: np.ndarray,
+    segments: np.ndarray,
+    bands: List[int] = [0, 1, 2],
+    n_components: int = 3,
+    band_combos: List[Tuple[int, int]] = None,
+) -> dict:
     """
     Complete superpixel processing pipeline using StandardDII approach.
 
@@ -517,15 +548,23 @@ def process_superpixel_dii_pipeline(image: np.ndarray,
     # Default band combinations for DII calculation
     if band_combos is None:
         band_combos = [
-            (1, 5), (2, 3), (2, 4), (1, 2), (0, 3),
-            (1, 4), (1, 3), (4, 8), (2, 9), (2, 5)
+            (1, 5),
+            (2, 3),
+            (2, 4),
+            (1, 2),
+            (0, 3),
+            (1, 4),
+            (1, 3),
+            (4, 8),
+            (2, 9),
+            (2, 5),
         ]
-    
+
     # Extract superpixel features for specified bands
     unique_segments = np.unique(segments)
     if unique_segments[0] == 0:  # Remove background if present
         unique_segments = unique_segments[1:]
-    
+
     # Create feature matrix: each row is a superpixel, columns are band values
     features = []
     for segment_id in unique_segments:
@@ -537,69 +576,66 @@ def process_superpixel_dii_pipeline(image: np.ndarray,
             features.append(segment_features)
         else:
             features.append(np.zeros(len(bands)))
-    
+
     features = np.array(features)
-    
+
     # Apply PCA transformation
     pca = PCA(n_components=min(3, features.shape[1]))
     transformed = pca.fit_transform(features)
-    
+
     # Apply Gaussian Mixture Model clustering
     gmm = GaussianMixture(n_components=n_components, random_state=42)
     cluster_labels = gmm.fit_predict(transformed)
-    
+
     # Determine the 'deep' cluster based on minimum mean value of first component
     deep_idx = np.argmin(gmm.means_[:, 0])
-    
+
     # Create cluster map
     temp_arr = np.zeros_like(segments)
     for idx, segment_id in enumerate(unique_segments):
         temp_arr[segments == segment_id] = cluster_labels[idx]
-    
+
     # Create deep and shallow masks
     deep_mask = temp_arr == deep_idx
     shallow_mask = temp_arr != deep_idx
-    
+
     # Extract deep and shallow pixel values
     deep_pixels = image[deep_mask]
     shallow_pixels = image[shallow_mask]
-    
+
     # Calculate DII for each band combination
     stack_shape = (*image.shape[:2], len(band_combos))
     dii_stack = np.zeros(stack_shape)
-    
+
     for idx, (band1, band2) in enumerate(band_combos):
         # Check if bands exist in image
         if band1 >= image.shape[2] or band2 >= image.shape[2]:
             continue
-            
+
         # Calculate slope using StandardDII method
         ki, (Ls_i, Ls_j) = calculate_slope_from_values(
             deep_i=deep_pixels[:, band1],
             deep_j=deep_pixels[:, band2],
             shallow_i=shallow_pixels[:, band1],
-            shallow_j=shallow_pixels[:, band2]
+            shallow_j=shallow_pixels[:, band2],
         )
-        
+
         # Apply DII transformation to entire image
         dii_stack[:, :, idx] = apply_depth_invariant_index(
-            image[:, :, band1],
-            image[:, :, band2],
-            ki,
-            (Ls_i, Ls_j)
+            image[:, :, band1], image[:, :, band2], ki, (Ls_i, Ls_j)
         )
-    
+
     return {
-        'segments': segments,
-        'cluster_map': temp_arr,
-        'deep_mask': deep_mask,
-        'shallow_mask': shallow_mask,
-        'deep_idx': deep_idx,
-        'cluster_labels': cluster_labels,
-        'features': features,
-        'transformed_features': transformed,
-        'gmm': gmm,
-        'pca': pca,
-        'dii_stack': dii_stack,
-        'band_combos': band_combos
+        "segments": segments,
+        "cluster_map": temp_arr,
+        "deep_mask": deep_mask,
+        "shallow_mask": shallow_mask,
+        "deep_idx": deep_idx,
+        "cluster_labels": cluster_labels,
+        "features": features,
+        "transformed_features": transformed,
+        "gmm": gmm,
+        "pca": pca,
+        "dii_stack": dii_stack,
+        "band_combos": band_combos,
     }
