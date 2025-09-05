@@ -17,9 +17,9 @@ from ShallowLearn.Indices import (
 @pytest.fixture
 def sample_image():
     """Create a synthetic multi-spectral image for testing."""
-    # Create image with 12 bands (like Sentinel-2)
+    # Create image with 13 bands (like Sentinel-2, including B12 at index 12)
     np.random.seed(42)  # For reproducible tests
-    image = np.random.rand(50, 50, 12) * 3000  # Simulate reflectance values
+    image = np.random.rand(50, 50, 13) * 3000  # Simulate reflectance values
     
     # Add some realistic patterns
     # Make NIR (B08, index 7) generally higher than Red (B04, index 3) for vegetation
@@ -28,7 +28,8 @@ def sample_image():
     
     # Make SWIR bands have different characteristics
     image[:, :, 10] = image[:, :, 10] * 0.7 + 800  # B11 (SWIR1)
-    image[:, :, 11] = image[:, :, 11] * 0.6 + 600  # B12 (SWIR2)
+    image[:, :, 11] = image[:, :, 11] * 0.6 + 600  # B11 (SWIR1 - actual index)
+    image[:, :, 12] = image[:, :, 12] * 0.5 + 400  # B12 (SWIR2)
     
     return image.astype(np.uint16)
 
@@ -36,7 +37,7 @@ def sample_image():
 @pytest.fixture
 def sample_image_with_zeros():
     """Create a synthetic image with some zero values for testing edge cases."""
-    image = np.random.rand(20, 20, 12) * 2000 + 500
+    image = np.random.rand(20, 20, 13) * 2000 + 500
     
     # Add some zero values
     image[0:5, 0:5, :] = 0  # Top-left corner all zeros

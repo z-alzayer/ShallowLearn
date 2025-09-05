@@ -323,9 +323,11 @@ class TestSegmentationSuperpixels:
 
     def test_process_superpixel_pipeline(self, sample_image):
         """Test complete superpixel processing pipeline."""
-        result = process_superpixel_dii_pipeline(
-            sample_image, segmentation_method="slic", n_segments=50, pca_components=3
-        )
+        # First create segments
+        segments = slic_segmentation(sample_image, n_segments=50)
+        
+        # Then process with DII pipeline
+        result = process_superpixel_dii_pipeline(sample_image, segments, n_components=3)
 
         assert isinstance(result, dict)
         assert "segments" in result
@@ -503,8 +505,8 @@ class TestModularIntegration:
         # 5. Calculate spectral indices
         wqi_result = water_quality_index(img)
 
-        # 6. Process superpixel pipeline
-        pipeline_result = process_superpixel_pipeline(rgb_img, n_segments=30)
+        # 6. Process superpixel DII pipeline
+        pipeline_result = process_superpixel_dii_pipeline(rgb_img, segments)
 
         # Verify all steps completed successfully
         assert normalized_img.shape == img.shape
