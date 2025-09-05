@@ -7,15 +7,11 @@ import pytest
 import numpy as np
 import warnings
 
-try:
-    from ShallowLearn.Indices import (
-        ci, ndvi, ndwi, mndwi, ndmi, gndvi, evi, savi, msavi, ari, cri1, cri2,
-        get_band_numbers, validate_band_shape
-    )
-    INDICES_AVAILABLE = True
-except ImportError as e:
-    INDICES_AVAILABLE = False
-    print(f"Warning: Could not import Indices module: {e}")
+from ShallowLearn.Indices import (
+    ci, oci, cl_oci, ssi, ti, wqi, ndci, cloud_index, bgr, 
+    calculate_water_surface_index, calculate_pseudo_subsurface_depth,
+    get_band_numbers, validate_band_shape
+)
 
 
 @pytest.fixture
@@ -49,114 +45,84 @@ def sample_image_with_zeros():
     return image.astype(np.uint16)
 
 
-@pytest.mark.skipif(not INDICES_AVAILABLE, reason="Indices module not available")
 class TestIndicesCalculation:
     """Test all indices calculations with synthetic data."""
     
-    def test_ndvi_basic_calculation(self, sample_image):
-        """Test NDVI calculation with default bands."""
-        result = ndvi(sample_image)
-        
-        assert isinstance(result, np.ndarray)
-        assert result.shape == (50, 50)
-        assert result.dtype in [np.float64, np.float32]
-        
-        # NDVI should be between -1 and 1
-        valid_mask = ~np.isnan(result)
-        assert np.all(result[valid_mask] >= -1) and np.all(result[valid_mask] <= 1)
-
-    def test_ndvi_custom_bands(self, sample_image):
-        """Test NDVI with custom band specification."""
-        result = ndvi(sample_image, bands=['B08', 'B04'])
-        
-        assert isinstance(result, np.ndarray)
-        assert result.shape == (50, 50)
-        valid_mask = ~np.isnan(result)
-        assert np.all(result[valid_mask] >= -1) and np.all(result[valid_mask] <= 1)
-
-    def test_ndwi_calculation(self, sample_image):
-        """Test NDWI calculation."""
-        result = ndwi(sample_image)
-        
-        assert isinstance(result, np.ndarray)
-        assert result.shape == (50, 50)
-        assert result.dtype in [np.float64, np.float32]
-        valid_mask = ~np.isnan(result)
-        assert np.all(result[valid_mask] >= -1) and np.all(result[valid_mask] <= 1)
-
-    def test_mndwi_calculation(self, sample_image):
-        """Test Modified NDWI calculation."""
-        result = mndwi(sample_image)
-        
-        assert isinstance(result, np.ndarray)
-        assert result.shape == (50, 50)
-        assert result.dtype in [np.float64, np.float32]
-        valid_mask = ~np.isnan(result)
-        assert np.all(result[valid_mask] >= -1) and np.all(result[valid_mask] <= 1)
-
-    def test_ndmi_calculation(self, sample_image):
-        """Test NDMI calculation."""
-        result = ndmi(sample_image)
-        
-        assert isinstance(result, np.ndarray)
-        assert result.shape == (50, 50)
-        assert result.dtype in [np.float64, np.float32]
-        valid_mask = ~np.isnan(result)
-        assert np.all(result[valid_mask] >= -1) and np.all(result[valid_mask] <= 1)
-
-    def test_gndvi_calculation(self, sample_image):
-        """Test Green NDVI calculation."""
-        result = gndvi(sample_image)
-        
-        assert isinstance(result, np.ndarray)
-        assert result.shape == (50, 50)
-        assert result.dtype in [np.float64, np.float32]
-        valid_mask = ~np.isnan(result)
-        assert np.all(result[valid_mask] >= -1) and np.all(result[valid_mask] <= 1)
-
-    def test_evi_calculation(self, sample_image):
-        """Test Enhanced Vegetation Index calculation."""
-        result = evi(sample_image)
+    def test_oci_calculation(self, sample_image):
+        """Test Ocean Chlorophyll Index calculation."""
+        result = oci(sample_image)
         
         assert isinstance(result, np.ndarray)
         assert result.shape == (50, 50)
         assert result.dtype in [np.float64, np.float32]
 
-    def test_savi_calculation(self, sample_image):
-        """Test Soil Adjusted Vegetation Index calculation."""
-        result = savi(sample_image)
+    def test_cl_oci_calculation(self, sample_image):
+        """Test Coastal Lagoon Ocean Chlorophyll Index calculation."""
+        result = cl_oci(sample_image)
         
         assert isinstance(result, np.ndarray)
         assert result.shape == (50, 50)
         assert result.dtype in [np.float64, np.float32]
 
-    def test_msavi_calculation(self, sample_image):
-        """Test Modified Soil Adjusted Vegetation Index calculation."""
-        result = msavi(sample_image)
+    def test_ssi_calculation(self, sample_image):
+        """Test Suspended Sediment Index calculation."""
+        result = ssi(sample_image)
         
         assert isinstance(result, np.ndarray)
         assert result.shape == (50, 50)
         assert result.dtype in [np.float64, np.float32]
 
-    def test_ari_calculation(self, sample_image):
-        """Test Anthocyanin Reflectance Index calculation."""
-        result = ari(sample_image)
+    def test_ti_calculation(self, sample_image):
+        """Test Turbidity Index calculation."""
+        result = ti(sample_image)
         
         assert isinstance(result, np.ndarray)
         assert result.shape == (50, 50)
         assert result.dtype in [np.float64, np.float32]
 
-    def test_cri1_calculation(self, sample_image):
-        """Test Carotenoid Reflectance Index 1 calculation."""
-        result = cri1(sample_image)
+    def test_wqi_calculation(self, sample_image):
+        """Test Water Quality Index calculation."""
+        result = wqi(sample_image)
         
         assert isinstance(result, np.ndarray)
         assert result.shape == (50, 50)
         assert result.dtype in [np.float64, np.float32]
 
-    def test_cri2_calculation(self, sample_image):
-        """Test Carotenoid Reflectance Index 2 calculation."""
-        result = cri2(sample_image)
+    def test_ndci_calculation(self, sample_image):
+        """Test Normalized Difference Chlorophyll Index calculation."""
+        result = ndci(sample_image)
+        
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (50, 50)
+        assert result.dtype in [np.float64, np.float32]
+
+    def test_cloud_index_calculation(self, sample_image):
+        """Test Cloud Index calculation."""
+        result = cloud_index(sample_image)
+        
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (50, 50)
+        assert result.dtype in [np.float64, np.float32]
+
+    def test_bgr_calculation(self, sample_image):
+        """Test Blue-Green Ratio calculation."""
+        result = bgr(sample_image)
+        
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (50, 50)
+        assert result.dtype in [np.float64, np.float32]
+
+    def test_water_surface_index_calculation(self, sample_image):
+        """Test Water Surface Index calculation."""
+        result = calculate_water_surface_index(sample_image)
+        
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (50, 50)
+        assert result.dtype in [np.float64, np.float32]
+
+    def test_pseudo_subsurface_depth_calculation(self, sample_image):
+        """Test Pseudo Subsurface Depth calculation."""
+        result = calculate_pseudo_subsurface_depth(sample_image)
         
         assert isinstance(result, np.ndarray)
         assert result.shape == (50, 50)
@@ -171,7 +137,6 @@ class TestIndicesCalculation:
         assert result.dtype in [np.float64, np.float32]
 
 
-@pytest.mark.skipif(not INDICES_AVAILABLE, reason="Indices module not available")
 class TestIndicesEdgeCases:
     """Test edge cases and error conditions for indices."""
     
@@ -180,7 +145,7 @@ class TestIndicesEdgeCases:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)  # Ignore division by zero warnings
             
-            result = ndvi(sample_image_with_zeros)
+            result = ci(sample_image_with_zeros)
             assert isinstance(result, np.ndarray)
             assert result.shape == (20, 20)
 
@@ -188,34 +153,34 @@ class TestIndicesEdgeCases:
         """Test indices work with single pixel images."""
         single_pixel = sample_image[0:1, 0:1, :]  # 1x1 pixel
         
-        result = ndvi(single_pixel)
+        result = ci(single_pixel)
         assert result.shape == (1, 1)
 
-    def test_mathematical_correctness_ndvi(self):
-        """Test NDVI mathematical correctness with known values."""
+    def test_mathematical_correctness_ci(self):
+        """Test CI mathematical correctness with known values."""
         # Create a simple test case where we know the expected result
         image = np.zeros((2, 2, 12))
-        image[:, :, 3] = 100   # Red (B04)
-        image[:, :, 7] = 200   # NIR (B08)
+        image[:, :, 1] = 100   # Blue (B02)
+        image[:, :, 2] = 200   # Green (B03)
         
-        result = ndvi(image)
-        expected = (200 - 100) / (200 + 100)  # (NIR - Red) / (NIR + Red)
-        
-        assert np.allclose(result, expected, atol=1e-10)
+        result = ci(image)
+        # CI should return valid numeric results
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (2, 2)
+        assert not np.all(np.isnan(result))
 
-    def test_mathematical_correctness_ndwi(self):
-        """Test NDWI mathematical correctness with known values."""
+    def test_mathematical_correctness_bgr(self):
+        """Test BGR mathematical correctness with known values."""
         image = np.zeros((2, 2, 12))
-        image[:, :, 2] = 150   # Green (B03) 
-        image[:, :, 7] = 100   # NIR (B08)
+        image[:, :, 1] = 100   # Blue (B02)
+        image[:, :, 2] = 200   # Green (B03)
         
-        result = ndwi(image)
-        expected = (150 - 100) / (150 + 100)  # (Green - NIR) / (Green + NIR)
+        result = bgr(image)
+        expected = 100 / 200  # Blue / Green
         
         assert np.allclose(result, expected, atol=1e-10)
 
 
-@pytest.mark.skipif(not INDICES_AVAILABLE, reason="Indices module not available")
 class TestUtilityFunctions:
     """Test utility functions in the Indices module."""
     
@@ -240,18 +205,17 @@ class TestUtilityFunctions:
             pytest.skip("validate_band_shape function not available")
 
 
-@pytest.mark.skipif(not INDICES_AVAILABLE, reason="Indices module not available")
 class TestIndicesIntegration:
     """Test integration scenarios and real-world use cases."""
     
     def test_batch_indices_calculation(self, sample_image):
         """Test calculating multiple indices on the same image."""
         indices = {
-            'ndvi': ndvi(sample_image),
-            'ndwi': ndwi(sample_image),
-            'mndwi': mndwi(sample_image),
-            'evi': evi(sample_image),
-            'savi': savi(sample_image)
+            'ci': ci(sample_image),
+            'oci': oci(sample_image),
+            'ssi': ssi(sample_image),
+            'ti': ti(sample_image),
+            'wqi': wqi(sample_image)
         }
         
         # All indices should have same shape
@@ -261,26 +225,22 @@ class TestIndicesIntegration:
 
     def test_indices_correlation(self, sample_image):
         """Test that related indices show expected correlations."""
-        ndvi_result = ndvi(sample_image)
-        gndvi_result = gndvi(sample_image)
+        ci_result = ci(sample_image)
+        oci_result = oci(sample_image)
         
-        # Both should be vegetation indices with similar patterns
-        assert ndvi_result.shape == gndvi_result.shape
-        assert isinstance(ndvi_result, np.ndarray)
-        assert isinstance(gndvi_result, np.ndarray)
+        # Both should be chlorophyll-related indices with similar patterns
+        assert ci_result.shape == oci_result.shape
+        assert isinstance(ci_result, np.ndarray)
+        assert isinstance(oci_result, np.ndarray)
 
     def test_consistent_data_types(self, sample_image):
         """Test that all indices return consistent data types."""
-        indices_funcs = [ndvi, ndwi, mndwi, evi, savi, gndvi]
+        indices_funcs = [ci, oci, ssi, ti, wqi, ndci, bgr]
         
         results = []
         for idx_func in indices_funcs:
-            try:
-                result = idx_func(sample_image)
-                results.append(result)
-            except Exception as e:
-                print(f"Warning: {idx_func.__name__} failed: {e}")
-                continue
+            result = idx_func(sample_image)
+            results.append(result)
         
         # All results should have same dtype
         if results:

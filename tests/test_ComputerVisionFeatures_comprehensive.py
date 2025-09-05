@@ -7,14 +7,10 @@ import pytest
 import numpy as np
 import warnings
 
-try:
-    from ShallowLearn.ComputerVisionFeatures import (
-        edge_density, texture_features, gabor_features, hog_features
-    )
-    CV_FEATURES_AVAILABLE = True
-except ImportError as e:
-    CV_FEATURES_AVAILABLE = False
-    print(f"Warning: Could not import ComputerVisionFeatures module: {e}")
+from ShallowLearn.ComputerVisionFeatures import (
+    edge_density, texture_features, color_histogram, sobel_edge_detection, 
+    gabor_features, histogram_of_oriented_gradients
+)
 
 
 @pytest.fixture
@@ -78,7 +74,6 @@ def sample_multispectral_image():
     return image
 
 
-@pytest.mark.skipif(not CV_FEATURES_AVAILABLE, reason="ComputerVisionFeatures module not available")
 class TestEdgeDensity:
     """Test edge density calculation."""
     
@@ -151,7 +146,6 @@ class TestEdgeDensity:
         assert np.mean(result) > 0.3
 
 
-@pytest.mark.skipif(not CV_FEATURES_AVAILABLE, reason="ComputerVisionFeatures module not available")
 class TestTextureFeatures:
     """Test Local Binary Pattern (LBP) texture features."""
     
@@ -204,28 +198,21 @@ class TestTextureFeatures:
         assert result.shape == (10, 10)
 
 
-@pytest.mark.skipif(not CV_FEATURES_AVAILABLE, reason="ComputerVisionFeatures module not available")
 class TestGaborFeatures:
     """Test Gabor filter features."""
     
     def test_gabor_features_basic(self, sample_rgb_image):
         """Test basic Gabor features calculation."""
-        try:
-            result = gabor_features(sample_rgb_image)
-            
-            assert isinstance(result, np.ndarray)
-            assert len(result.shape) == 2 or len(result.shape) == 3
-            assert result.shape[0] == 50 and result.shape[1] == 50
-        except (NameError, AttributeError):
-            pytest.skip("Gabor features function not available")
+        result = gabor_features(sample_rgb_image)
+        
+        assert isinstance(result, np.ndarray)
+        assert len(result.shape) == 2 or len(result.shape) == 3
+        assert result.shape[0] == 50 and result.shape[1] == 50
 
     def test_gabor_features_parameters(self, sample_rgb_image):
         """Test Gabor features with custom parameters."""
-        try:
-            result = gabor_features(sample_rgb_image, frequency=0.6, theta=45)
-            assert isinstance(result, np.ndarray)
-        except (NameError, AttributeError, TypeError):
-            pytest.skip("Gabor features with parameters not available")
+        result = gabor_features(sample_rgb_image, frequency=0.6)
+        assert isinstance(result, np.ndarray)
 
     def test_gabor_features_multispectral(self, sample_multispectral_image):
         """Test Gabor features on multispectral image.""" 
@@ -236,7 +223,6 @@ class TestGaborFeatures:
             pytest.skip("Gabor features function not available")
 
 
-@pytest.mark.skipif(not CV_FEATURES_AVAILABLE, reason="ComputerVisionFeatures module not available")
 class TestHOGFeatures:
     """Test Histogram of Oriented Gradients (HOG) features."""
     
@@ -271,7 +257,6 @@ class TestHOGFeatures:
             pytest.skip("HOG features function not available")
 
 
-@pytest.mark.skipif(not CV_FEATURES_AVAILABLE, reason="ComputerVisionFeatures module not available")
 class TestComputerVisionIntegration:
     """Test integration and combination of computer vision features."""
     
@@ -286,15 +271,8 @@ class TestComputerVisionIntegration:
             pytest.fail(f"Failed to calculate basic features: {e}")
         
         # Additional features (may not be available)
-        try:
-            features['gabor'] = gabor_features(sample_rgb_image)
-        except:
-            pass
-            
-        try:
-            features['hog'] = hog_features(sample_rgb_image)
-        except:
-            pass
+        features['gabor'] = gabor_features(sample_rgb_image)
+        features['hog'] = hog_features(sample_rgb_image)
         
         # Check that basic features are calculated
         assert 'edge_density' in features
@@ -353,7 +331,6 @@ class TestComputerVisionIntegration:
             assert texture_result.shape == (h, w)
 
 
-@pytest.mark.skipif(not CV_FEATURES_AVAILABLE, reason="ComputerVisionFeatures module not available")
 class TestComputerVisionEdgeCases:
     """Test edge cases and error conditions."""
     
@@ -391,12 +368,8 @@ class TestComputerVisionEdgeCases:
         assert edge_result.shape == (1, 1)
         
         # LBP might not work on 1x1 images, so we expect it might fail gracefully
-        try:
-            texture_result = texture_features(single_pixel)
-            assert texture_result.shape == (1, 1)
-        except:
-            # This is acceptable for 1x1 images
-            pass
+        texture_result = texture_features(single_pixel)
+        assert texture_result.shape == (1, 1)
 
     def test_very_small_image(self):
         """Test features on very small images."""
@@ -406,12 +379,8 @@ class TestComputerVisionEdgeCases:
         assert edge_result.shape == (3, 3)
         
         # Texture features might struggle with very small images
-        try:
-            texture_result = texture_features(small_image, R=1)  # Use small radius
-            assert texture_result.shape == (3, 3)
-        except:
-            # Acceptable failure for very small images
-            pass
+        texture_result = texture_features(small_image, R=1)  # Use small radius
+        assert texture_result.shape == (3, 3)
 
     def test_extreme_contrast_image(self):
         """Test features on extreme contrast image."""

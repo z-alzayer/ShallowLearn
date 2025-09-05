@@ -113,12 +113,8 @@ class TestBandMappingRefactoringNeeds:
         test_image = np.random.randint(0, 1000, (50, 50, 13), dtype=np.uint16)
         
         # Current indices functions use hardcoded band_mapping
-        try:
-            ci_result = Indices.ci(test_image)
-            assert ci_result is not None
-        except Exception as e:
-            # May fail due to band mapping issues or other dependencies
-            assert True  # Expected for now
+        ci_result = Indices.ci(test_image)
+        assert ci_result is not None
         
         # TODO: After refactoring, indices should accept band_mapping parameter
         # like: ci(test_image, bands=['B04', 'B05', 'B06', 'B07'], band_mapping=landsat_mapping)
