@@ -3,7 +3,8 @@ import re
 import requests
 import os
 
-import ShallowLearn.LoadData as ld
+# LoadData module deprecated - functionality moved to ShallowLearn.io
+# import ShallowLearn.LoadData as ld
 import ShallowLearn.FileProcessing as fp
 import ShallowLearn.Util as utilities
 import ShallowLearn.QuickLook as quicklook

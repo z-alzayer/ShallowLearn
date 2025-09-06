@@ -128,7 +128,15 @@ def gabor_features(image, frequency=0.6):
       The filtered image.
     """
     if image.shape[2] > 1:
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+        if image.shape[2] == 3:
+            # RGB image - use OpenCV conversion
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+        elif image.shape[2] == 4:
+            # RGBA image - use OpenCV conversion
+            image = cv2.cvtColor(image, cv2.COLOR_RGBA2GRAY)
+        else:
+            # Multispectral image - take mean across all channels
+            image = np.mean(image, axis=2).astype(np.uint8)
 
     # Applying Gabor filter
     gabor_response, _ = gabor(image, frequency=frequency)

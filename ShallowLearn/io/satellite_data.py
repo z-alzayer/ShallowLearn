@@ -441,3 +441,250 @@ def create_satellite_collection(
     else:
         # Default to Landsat if uncertain
         return LandsatImageCollection(directory)
+
+
+class GeoTIFFImage:
+    """
+    Generic GeoTIFF loader with backwards compatibility to LoadGeoTIFF.
+    
+    Supports various GeoTIFF types including:
+    - Planetscope individual band files
+    - GBR benthic classification data
+    - Generic single/multi-band GeoTIFF files
+    """
+    
+    def __init__(self, file_path: str):
+        """
+        Initialize GeoTIFF loader.
+        
+        Parameters:
+        -----------
+        file_path : str
+            Path to the GeoTIFF file
+        """
+        self.data_source = file_path  # Maintain compatibility with LoadGeoTIFF
+        self.path = Path(file_path)
+        self.metadata = None
+        self.bounds = None
+        self.image = None
+        
+        if not self.path.exists():
+            raise FileNotFoundError(f"GeoTIFF file not found: {file_path}")
+            
+    def load(self) -> np.ndarray:
+        """
+        Load GeoTIFF data with backwards compatibility.
+        
+        Returns:
+        --------
+        np.ndarray
+            Image data with shape (bands, height, width)
+        """
+        try:
+            with rio.open(self.data_source) as src:
+                # Read all bands
+                data = src.read()
+                
+                # Handle nodata values similar to original LoadGeoTIFF
+                no_data = src.nodatavals
+                if no_data and any(nd is not None for nd in no_data):
+                    # Create mask for nodata values but don't apply it yet
+                    # (maintaining compatibility with original behavior)
+                    pass
+                    
+                self.image = data
+                return data
+                
+        except Exception as e:
+            raise RuntimeError(f"Failed to load GeoTIFF {self.data_source}: {e}")
+    
+    def get_metadata(self) -> dict:
+        """
+        Get rasterio metadata for the GeoTIFF file.
+        
+        Returns:
+        --------
+        dict
+            Rasterio metadata dictionary
+        """
+        try:
+            with rio.open(self.data_source) as src:
+                self.metadata = src.meta.copy()
+            return self.metadata
+        except Exception as e:
+            raise RuntimeError(f"Failed to get metadata for {self.data_source}: {e}")
+    
+    def get_bounds(self) -> rio.coords.BoundingBox:
+        """
+        Get spatial bounds of the GeoTIFF file.
+        
+        Returns:
+        --------
+        rasterio.coords.BoundingBox
+            Bounding box (left, bottom, right, top)
+        """
+        try:
+            with rio.open(self.data_source) as src:
+                self.bounds = src.bounds
+            return self.bounds
+        except Exception as e:
+            raise RuntimeError(f"Failed to get bounds for {self.data_source}: {e}")
+    
+    def get_crs(self):
+        """
+        Get coordinate reference system.
+        
+        Returns:
+        --------
+        rasterio.crs.CRS
+            Coordinate reference system
+        """
+        try:
+            with rio.open(self.data_source) as src:
+                return src.crs
+        except Exception as e:
+            raise RuntimeError(f"Failed to get CRS for {self.data_source}: {e}")
+    
+    def get_transform(self):
+        """
+        Get affine transform.
+        
+        Returns:
+        --------
+        rasterio.Affine
+            Affine transformation
+        """
+        try:
+            with rio.open(self.data_source) as src:
+                return src.transform
+        except Exception as e:
+            raise RuntimeError(f"Failed to get transform for {self.data_source}: {e}")
+    
+    @property
+    def shape(self) -> Tuple[int, ...]:
+        """Get image shape without loading full data."""
+        if self.image is not None:
+            return self.image.shape
+        try:
+            with rio.open(self.data_source) as src:
+                return (src.count, src.height, src.width)
+        except Exception as e:
+            raise RuntimeError(f"Failed to get shape for {self.data_source}: {e}")
+    
+    @property
+    def dtype(self):
+        """Get image data type without loading full data."""
+        try:
+            with rio.open(self.data_source) as src:
+                return src.dtypes[0]  # Assume all bands have same dtype
+        except Exception as e:
+            raise RuntimeError(f"Failed to get dtype for {self.data_source}: {e}")
+    
+    def __repr__(self) -> str:
+        shape_str = f"{self.shape}" if hasattr(self, 'shape') else "Unknown"
+        return f"<GeoTIFFImage: {self.path.name}, Shape: {shape_str}>"
+
+
+class GeoTIFFCollection:
+    """
+    Collection manager for multiple GeoTIFF files.
+    
+    Useful for handling datasets like Planetscope with multiple single-band files
+    or collections of classification/analysis results.
+    """
+    
+    def __init__(self, directory: str, pattern: str = "*.tif"):
+        """
+        Initialize collection from directory.
+        
+        Parameters:
+        -----------
+        directory : str
+            Directory containing GeoTIFF files
+        pattern : str, default "*.tif"
+            Glob pattern to match files
+        """
+        self.directory = Path(directory)
+        self.pattern = pattern
+        self.files = []
+        self.images = []
+        
+        if not self.directory.exists():
+            raise FileNotFoundError(f"Directory not found: {directory}")
+            
+        self._discover_files()
+    
+    def _discover_files(self):
+        """Discover and sort GeoTIFF files in directory."""
+        self.files = sorted(list(self.directory.glob(self.pattern)))
+        
+        if not self.files:
+            raise ValueError(f"No files matching pattern '{self.pattern}' found in {self.directory}")
+    
+    def load_all(self) -> List[GeoTIFFImage]:
+        """
+        Load all GeoTIFF files in the collection.
+        
+        Returns:
+        --------
+        List[GeoTIFFImage]
+            List of loaded GeoTIFF images
+        """
+        self.images = []
+        for file_path in self.files:
+            try:
+                img = GeoTIFFImage(str(file_path))
+                img.load()
+                self.images.append(img)
+            except Exception as e:
+                print(f"Warning: Failed to load {file_path}: {e}")
+                continue
+        
+        return self.images
+    
+    def get_file_list(self) -> List[Path]:
+        """Get list of discovered files."""
+        return self.files.copy()
+    
+    def stack_images(self) -> np.ndarray:
+        """
+        Stack all images into a single array.
+        
+        Returns:
+        --------
+        np.ndarray
+            Stacked images with shape (n_images, bands, height, width)
+        """
+        if not self.images:
+            self.load_all()
+        
+        if not self.images:
+            raise ValueError("No images successfully loaded")
+        
+        # Assume all images have compatible shapes
+        stacked = np.stack([img.image for img in self.images], axis=0)
+        return stacked
+    
+    def __len__(self) -> int:
+        return len(self.files)
+    
+    def __getitem__(self, index: int) -> GeoTIFFImage:
+        """Get image by index, loading if necessary."""
+        if index >= len(self.files):
+            raise IndexError(f"Index {index} out of range for {len(self.files)} files")
+        
+        if index >= len(self.images):
+            # Load missing images up to requested index
+            for i in range(len(self.images), index + 1):
+                img = GeoTIFFImage(str(self.files[i]))
+                img.load()
+                self.images.append(img)
+        
+        return self.images[index]
+    
+    def __repr__(self) -> str:
+        return f"<GeoTIFFCollection: {len(self.files)} files in {self.directory.name}>"
+
+
+# Backwards compatibility alias
+LoadGeoTIFF = GeoTIFFImage

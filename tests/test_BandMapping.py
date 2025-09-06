@@ -2,40 +2,51 @@ import pytest
 import numpy as np
 from unittest.mock import Mock, patch
 from ShallowLearn.band_mapping import band_mapping
-from ShallowLearn import ImageHelper, Indices
+# ImageHelper module removed - functions moved to new modular structure
+# from ShallowLearn import ImageHelper, Indices
+from ShallowLearn import Indices
+from ShallowLearn.visualization.display import create_rgb_image
+from ShallowLearn.core.array_utils import get_band_numbers
 
 
 class TestBandMappingDependencies:
     """Test to identify and verify band mapping dependencies across modules"""
     
-    def test_imagehelper_plot_rgb_uses_band_mapping(self):
-        """Test that ImageHelper.plot_rgb uses band_mapping correctly"""
+    def test_visualization_create_rgb_uses_band_mapping(self):
+        """Test that visualization.create_rgb_image works with band_mapping"""
         # Create test image data
         test_image = np.random.randint(0, 1000, (100, 100, 13), dtype=np.uint16)
         
-        # Test with default bands (should use band_mapping)
-        rgb_result = ImageHelper.plot_rgb(test_image, plot=False)
+        # Test with default RGB bands using band_mapping
+        default_bands = ['B04', 'B03', 'B02']  # Red, Green, Blue
+        band_indices = get_band_numbers(default_bands, band_mapping)
+        rgb_result = create_rgb_image(test_image, band_indices)
         
         assert isinstance(rgb_result, np.ndarray)
         assert rgb_result.shape == (100, 100, 3)
         assert rgb_result.dtype == np.uint8
 
-    def test_imagehelper_plot_rgb_with_custom_bands(self):
-        """Test that ImageHelper.plot_rgb works with custom band selection"""
+    def test_visualization_create_rgb_with_custom_bands(self):
+        """Test that visualization.create_rgb_image works with custom band selection"""
         test_image = np.random.randint(0, 1000, (100, 100, 13), dtype=np.uint16)
         
         # Test with custom band selection
         custom_bands = ['B08', 'B04', 'B03']  # NIR, Red, Green
-        rgb_result = ImageHelper.plot_rgb(test_image, bands=custom_bands, plot=False)
+        band_indices = get_band_numbers(custom_bands, band_mapping)
+        rgb_result = create_rgb_image(test_image, band_indices)
         
         assert isinstance(rgb_result, np.ndarray)
         assert rgb_result.shape == (100, 100, 3)
 
-    def test_imagehelper_band_mapping_dependency(self):
-        """Test that ImageHelper has the expected band_mapping dependency"""
-        # This test verifies the import exists and is accessible
-        assert hasattr(ImageHelper, 'band_mapping')
-        assert ImageHelper.band_mapping is not None
+    def test_core_utils_band_mapping_dependency(self):
+        """Test that core utils functions can access band_mapping"""
+        # This test verifies the band mapping functionality is accessible
+        test_bands = ['B04', 'B03', 'B02']
+        band_indices = get_band_numbers(test_bands, band_mapping)
+        
+        assert isinstance(band_indices, list)
+        assert len(band_indices) == 3
+        assert all(isinstance(idx, int) for idx in band_indices)
 
     def test_indices_band_mapping_dependency(self):
         """Test that Indices module has the expected band_mapping dependency"""
@@ -71,41 +82,50 @@ class TestBandMappingDependencies:
             assert isinstance(idx, int), f"Index {idx} is not an integer"
             assert idx >= 0, f"Index {idx} is negative"
 
-    @patch('ShallowLearn.ImageHelper.band_mapping')
-    def test_imagehelper_with_mock_band_mapping(self, mock_band_mapping):
-        """Test ImageHelper behavior with mocked band_mapping"""
-        # Create a minimal mock band mapping for Landsat
-        mock_band_mapping.return_value = {
+    def test_core_utils_with_custom_band_mapping(self):
+        """Test core utils functions with custom band_mapping"""
+        # Create a minimal custom band mapping for testing
+        custom_band_mapping = {
             'B04': {'index': 0},  # Red
             'B03': {'index': 1},  # Green  
             'B02': {'index': 2},  # Blue
         }
         
-        test_image = np.random.randint(0, 1000, (100, 100, 3), dtype=np.uint16)
+        test_bands = ['B04', 'B03', 'B02']
+        band_indices = get_band_numbers(test_bands, custom_band_mapping)
         
-        # This should work with the mocked band mapping
-        # Note: This test demonstrates how the code should work after refactoring
-        # to accept band_mapping as a parameter rather than importing it directly
+        assert band_indices == [0, 1, 2]
+        
+        # Test that this works with visualization
+        test_image = np.random.randint(0, 1000, (100, 100, 3), dtype=np.uint16)
+        rgb_result = create_rgb_image(test_image, band_indices)
+        assert rgb_result.shape == (100, 100, 3)
 
 
 class TestBandMappingRefactoringNeeds:
     """Tests that demonstrate the current tight coupling and need for refactoring"""
     
-    def test_hardcoded_band_mapping_in_imagehelper_plot_rgb(self):
-        """Demonstrate that plot_rgb has hardcoded band_mapping access"""
-        # This test shows the current limitation - plot_rgb cannot work with different satellites
-        # without modifying the global band_mapping
+    def test_modular_band_mapping_supports_flexibility(self):
+        """Demonstrate that new modular approach supports different band mappings"""
+        # This test shows the improved approach - functions accept band_mapping as parameter
         
         # Create test data
         test_image = np.random.randint(0, 1000, (100, 100, 13), dtype=np.uint16)
         
-        # Current implementation directly accesses band_mapping[band]['index']
-        # This makes it impossible to use different band mappings for different satellites
-        result = ImageHelper.plot_rgb(test_image, plot=False)
+        # New implementation allows different band mappings for different satellites
+        sentinel_bands = ['B04', 'B03', 'B02']
+        sentinel_indices = get_band_numbers(sentinel_bands, band_mapping)
+        result = create_rgb_image(test_image, sentinel_indices)
         assert result is not None
+        assert result.shape == (100, 100, 3)
         
-        # TODO: After refactoring, plot_rgb should accept a band_mapping parameter
-        # like: plot_rgb(test_image, bands=['B04', 'B03', 'B02'], band_mapping=landsat_mapping)
+        # Can also work with custom mappings
+        landsat_mapping = {
+            'B04': {'index': 3}, 'B03': {'index': 2}, 'B02': {'index': 1}  # Example Landsat bands
+        }
+        landsat_indices = get_band_numbers(['B04', 'B03', 'B02'], landsat_mapping)
+        landsat_result = create_rgb_image(test_image, landsat_indices)
+        assert landsat_result.shape == (100, 100, 3)
 
     def test_hardcoded_band_mapping_in_indices(self):
         """Demonstrate that Indices functions have hardcoded band_mapping access"""
@@ -121,7 +141,8 @@ class TestBandMappingRefactoringNeeds:
 
     def test_band_mapping_modification_affects_global_behavior(self):
         """Demonstrate that modifying band_mapping affects all modules"""
-        original_mapping = band_mapping.copy()
+        # Store the original value specifically
+        original_b02_index = band_mapping['B02']['index']
         
         try:
             # Modify the global band_mapping
@@ -130,13 +151,13 @@ class TestBandMappingRefactoringNeeds:
             test_image = np.random.randint(0, 1000, (100, 100, 13), dtype=np.uint16)
             
             # This should fail or behave incorrectly due to invalid index
-            with pytest.raises((IndexError, KeyError)):
-                ImageHelper.plot_rgb(test_image, plot=False)
+            with pytest.raises((IndexError, ValueError)):
+                band_indices = get_band_numbers(['B04', 'B03', 'B02'], band_mapping)
+                create_rgb_image(test_image, band_indices)
                 
         finally:
-            # Restore original mapping
-            band_mapping.clear()
-            band_mapping.update(original_mapping)
+            # Restore the original value specifically
+            band_mapping['B02']['index'] = original_b02_index
 
 
 class TestLandsatBandMappingPreparation:

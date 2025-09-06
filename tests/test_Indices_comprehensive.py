@@ -160,9 +160,12 @@ class TestIndicesEdgeCases:
     def test_mathematical_correctness_ci(self):
         """Test CI mathematical correctness with known values."""
         # Create a simple test case where we know the expected result
+        # CI uses bands ['B04', 'B05', 'B06', 'B07'] which are indices [3, 4, 5, 6] in band_mapping
         image = np.zeros((2, 2, 12))
-        image[:, :, 1] = 100   # Blue (B02)
-        image[:, :, 2] = 200   # Green (B03)
+        image[:, :, 3] = 100   # B04 (Red)
+        image[:, :, 4] = 150   # B05
+        image[:, :, 5] = 200   # B06  
+        image[:, :, 6] = 250   # B07
         
         result = ci(image)
         # CI should return valid numeric results

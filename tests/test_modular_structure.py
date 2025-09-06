@@ -331,10 +331,12 @@ class TestSegmentationSuperpixels:
 
         assert isinstance(result, dict)
         assert "segments" in result
-        assert "patches" in result
         assert "features" in result
-        assert "clusters" in result
-        assert "dii" in result
+        assert "cluster_map" in result
+        assert "cluster_labels" in result
+        assert "dii_stack" in result
+        assert "deep_mask" in result
+        assert "shallow_mask" in result
 
         assert result["segments"].shape == (100, 100)
 
@@ -380,9 +382,9 @@ class TestVisualizationDisplay:
         """Test RGB plotting without showing."""
         band_indices = [0, 1, 2]
 
-        fig = plot_rgb(sample_image, band_indices, show=False)
+        result = plot_rgb(sample_image, band_indices, plot=False)
 
-        assert fig is not None
+        assert result is not None
         mock_show.assert_not_called()
 
     @patch("matplotlib.pyplot.show")
@@ -390,7 +392,7 @@ class TestVisualizationDisplay:
         """Test RGB plotting with showing."""
         band_indices = [0, 1, 2]
 
-        result = plot_rgb(sample_image, band_indices, show=True)
+        result = plot_rgb(sample_image, band_indices, plot=True)
 
         assert result is None
         mock_show.assert_called_once()

@@ -528,3 +528,201 @@ def create_animation_frames(images: List[np.ndarray],
         frames.append(fig)
     
     return frames
+
+
+def plot_rgb_enhanced(
+    img: np.ndarray, 
+    band_indices: Optional[List[int]] = None,
+    band_mapping: Optional[Dict] = None,
+    band_names: Optional[List[str]] = None,
+    stretch: bool = True,
+    plot: bool = False,
+    title: str = "RGB Image",
+    figsize: Tuple[int, int] = (10, 8)
+) -> Union[np.ndarray, None]:
+    """
+    Enhanced RGB plotting function with flexible band selection and reduced hardcoding.
+    
+    This function replaces ImageHelper.plot_rgb with improved flexibility and reduced 
+    dependency on hardcoded band mappings.
+    
+    Parameters:
+    -----------
+    img : np.ndarray
+        Input image array with shape (height, width, bands)
+    band_indices : List[int], optional
+        List of 3 band indices for R, G, B channels. If None, defaults to [3, 2, 1] 
+        (which corresponds to typical Red, Green, Blue for Sentinel-2)
+    band_mapping : Dict, optional
+        Band mapping dictionary for converting band names to indices
+    band_names : List[str], optional  
+        List of 3 band names (e.g., ['B04', 'B03', 'B02']) to use with band_mapping
+    stretch : bool, default=True
+        Whether to apply min-max stretch to enhance contrast
+    plot : bool, default=False
+        Whether to display the image plot using matplotlib
+    title : str, default="RGB Image"
+        Title for the plot
+    figsize : Tuple[int, int], default=(10, 8)
+        Figure size if plotting
+        
+    Returns:
+    --------
+    np.ndarray or None
+        RGB image array with shape (height, width, 3) and dtype uint8 if plot=False,
+        otherwise None
+    """
+    # Determine band indices
+    if band_indices is None:
+        if band_names and band_mapping:
+            # Use band mapping to convert names to indices
+            band_indices = [band_mapping[band]['index'] for band in band_names]
+        elif band_names is None and band_mapping is None:
+            # Default to typical RGB bands for Sentinel-2 (B04=Red, B03=Green, B02=Blue)
+            band_indices = [3, 2, 1]  # Assuming 0-indexed bands
+        else:
+            raise ValueError("Either band_indices or both band_names and band_mapping must be provided")
+    
+    if len(band_indices) != 3:
+        raise ValueError("Exactly 3 band indices required for RGB")
+    
+    # Validate band indices
+    for idx in band_indices:
+        if idx >= img.shape[2]:
+            raise ValueError(f"Band index {idx} out of bounds for image with {img.shape[2]} bands")
+    
+    img_shape = img.shape
+    rgb_channels = []
+    
+    # Extract and process each channel
+    for band_idx in band_indices:
+        channel = img[:, :, band_idx].astype(float)
+        
+        if stretch:
+            # Apply min-max stretch
+            channel = minmax_scale(
+                channel.flatten(), 
+                feature_range=(0, 255), 
+                axis=0, 
+                copy=True
+            ).reshape(img_shape[0], img_shape[1])
+        else:
+            # Simple clipping to 0-255 range
+            channel = np.clip(channel, 0, 255)
+        
+        rgb_channels.append(np.uint8(channel))
+    
+    # Stack channels to create RGB image
+    rgb = np.dstack(rgb_channels)
+    
+    if plot:
+        plt.figure(figsize=figsize)
+        plt.imshow(rgb)
+        plt.title(title)
+        plt.axis('off')
+        plt.show()
+        return None
+    
+    return rgb
+
+
+def plot_color_space(
+    img: np.ndarray,
+    color_space: str = 'hsv',
+    band_indices: Optional[List[int]] = None,
+    band_mapping: Optional[Dict] = None,
+    band_names: Optional[List[str]] = None,
+    plot: bool = False,
+    title: Optional[str] = None,
+    figsize: Tuple[int, int] = (10, 8)
+) -> Union[np.ndarray, None]:
+    """
+    Convert image to different color spaces with flexible band selection.
+    
+    This function replaces ImageHelper functions like plot_hsv, plot_lab, plot_ycbcr
+    with a unified interface.
+    
+    Parameters:
+    -----------
+    img : np.ndarray
+        Input image array with shape (height, width, bands)
+    color_space : str, default='hsv'
+        Target color space ('hsv', 'lab', 'ycbcr')
+    band_indices : List[int], optional
+        List of 3 band indices for R, G, B channels used in conversion
+    band_mapping : Dict, optional
+        Band mapping dictionary for converting band names to indices  
+    band_names : List[str], optional
+        List of 3 band names to use with band_mapping
+    plot : bool, default=False
+        Whether to display the converted image
+    title : str, optional
+        Title for the plot. If None, auto-generated based on color_space
+    figsize : Tuple[int, int], default=(10, 8)
+        Figure size if plotting
+        
+    Returns:
+    --------
+    np.ndarray or None
+        Converted image array if plot=False, otherwise None
+        
+    Raises:
+    -------
+    ValueError
+        If color_space is not supported
+    """
+    # First create RGB image
+    rgb_img = plot_rgb_enhanced(
+        img, 
+        band_indices=band_indices,
+        band_mapping=band_mapping,
+        band_names=band_names,
+        stretch=True,
+        plot=False
+    )
+    
+    # Convert to requested color space
+    if color_space.lower() == 'hsv':
+        converted_img = rgb2hsv(rgb_img)
+        default_title = "HSV Color Space"
+    elif color_space.lower() == 'lab':
+        converted_img = rgb2lab(rgb_img)  
+        default_title = "LAB Color Space"
+    elif color_space.lower() == 'ycbcr':
+        converted_img = rgb2ycbcr(rgb_img)
+        default_title = "YCbCr Color Space"
+    else:
+        raise ValueError(f"Unsupported color space: {color_space}")
+    
+    if plot:
+        if title is None:
+            title = default_title
+            
+        fig, axes = plt.subplots(1, 3, figsize=figsize)
+        fig.suptitle(title)
+        
+        channel_names = {
+            'hsv': ['Hue', 'Saturation', 'Value'],
+            'lab': ['Lightness', 'A*', 'B*'],
+            'ycbcr': ['Luma', 'Chroma Blue', 'Chroma Red']
+        }
+        
+        names = channel_names.get(color_space.lower(), ['Channel 1', 'Channel 2', 'Channel 3'])
+        
+        for i in range(3):
+            axes[i].imshow(converted_img[:, :, i], cmap='gray')
+            axes[i].set_title(names[i])
+            axes[i].axis('off')
+        
+        plt.tight_layout()
+        plt.show()
+        return None
+    
+    return converted_img
+
+
+# Backwards compatibility aliases
+plot_rgb = plot_rgb_enhanced  # Direct alias for backwards compatibility
+plot_hsv = lambda img, plot=False: plot_color_space(img, 'hsv', plot=plot)
+plot_lab = lambda img, plot=False: plot_color_space(img, 'lab', plot=plot) 
+plot_ycbcr = lambda img, plot=False: plot_color_space(img, 'ycbcr', plot=plot)

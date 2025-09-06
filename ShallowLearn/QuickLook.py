@@ -17,10 +17,50 @@ from tqdm import tqdm
 
 import ShallowLearn.ExtractMetadata as extract_meta
 import ShallowLearn.FileProcessing as fp
-import ShallowLearn.Transform as trf
+# Transform functions moved to core.array_utils
+from ShallowLearn.core.array_utils import LCE_multi
 from ShallowLearn.API_Utils import filter_by_indices, filter_by_label
-from ShallowLearn.LoadData import LoadSentinel2L1C as load_sen2
-from ShallowLearn.LoadData import PVI_Dataloader
+# LoadData module removed - will need to update these imports later
+# from ShallowLearn.LoadData import LoadSentinel2L1C as load_sen2
+# from ShallowLearn.LoadData import PVI_Dataloader
+
+# Temporary PVI (Preview Image Files) loader - can be updated for API loading later
+class PVI_Dataloader:
+    """
+    Preview Image Files (PVI) data loader for ZIP files containing Sentinel-2 preview images.
+    This is a temporary implementation that can be extended for API-based loading.
+    """
+    
+    def __init__(self, data_source: str):
+        self.data_source = data_source
+        self.is_zip = data_source.endswith(".zip")
+        
+        if self.is_zip:
+            try:
+                import zipfile
+                import rasterio
+                
+                with zipfile.ZipFile(data_source, 'r') as zip_ref:
+                    # Find PVI files in the ZIP
+                    pvi_files = [f for f in zip_ref.namelist() if "PVI" in f and f.endswith(".jp2")]
+                    if not pvi_files:
+                        raise ValueError(f"No PVI files found in {data_source}")
+                    self.files = pvi_files[0]  # Take first PVI file
+            except Exception as e:
+                print(f"File: {data_source} failed. Please double check integrity of file")
+                raise e
+        
+        self.zip_path = f"zip+file://{data_source}/{self.files}"
+    
+    def load(self) -> np.ndarray:
+        """Load Preview Image Files data from ZIP file."""
+        import rasterio
+        
+        with rasterio.open(self.zip_path) as dataset:
+            pvi_image = dataset.read()
+            # Transpose from (bands, height, width) to (height, width, bands)
+            pvi_image = np.transpose(pvi_image, (1, 2, 0))
+        return pvi_image
 from ShallowLearn.Util import clip_image
 
 
@@ -394,14 +434,17 @@ class QuickLookPVI(QuickLookModel):
     def __init__(self, files, model=None):
         super().__init__(files, model)
         self.PVI = True
+        # Initialize load_zips default
+        self.load_zips = False
+        
         if len(files) <= 1 and os.path.isdir(files):
             files = fp.extract_pvi_images(files)
             self.load_zips = False
         elif len(files) > 1 and files[0].endswith(".zip"):
             self.load_zips = True
-
         elif isinstance(files, list):
             print("Starting PCA Model")
+            self.load_zips = False  # Default for list of files
         else:
             raise ValueError("Need to add a path or a list of files to use method")
         components = 4
@@ -417,17 +460,21 @@ class QuickLookPVI(QuickLookModel):
         files = []
         if self.load_zips is False:
             for file in self.files:
-                with Image.open(file) as im:
-                    imagery.append(np.array(im))
+                try:
+                    with Image.open(file) as im:
+                        imagery.append(np.array(im))
+                        files.append(file)  # Add successfully loaded files
+                except Exception as e:
+                    print(f"File Failed to load {file}: {e}")
         else:
             for file in self.files:
                 try:
                     img = PVI_Dataloader(file).load()
                     imagery.append(img)
                     files.append(file)
-                except:
-                    print(f"File Failed to load {file}")
-        self.files = files
+                except Exception as e:
+                    print(f"File Failed to load {file}: {e}")
+        self.files = files  # Update files to only include successfully loaded ones
         return imagery
 
     def generate_dataframe(self, directory, zips=False):
@@ -524,7 +571,7 @@ class QuickLookArea(QuickLookModel):
         shapefile,
         band_mapping=["B02", "B03", "B04", "B08"],
         resolution="10m",
-        stretch_type=trf.LCE_multi,
+        stretch_type=LCE_multi,
     ):
         self.df = df
         self.stretch_type = stretch_type

@@ -19,7 +19,8 @@ sys.path.insert(0, '/Users/ziad/Documents/GitHub/ShallowLearn')
 
 from ShallowLearn.io.satellite_data import (
     SatelliteImage, LandsatImage, Sentinel2Image,
-    SatelliteImageCollection, create_satellite_image
+    SatelliteImageCollection, LandsatImageCollection, Sentinel2ImageCollection, 
+    create_satellite_image, create_satellite_collection
 )
 from ShallowLearn.io.vrt_builder import (
     VRTBuilder, LandsatVRTBuilder, Sentinel2VRTBuilder
@@ -31,30 +32,31 @@ class TestRealDataAvailability:
     
     def test_landsat_data_exists(self):
         """Verify Landsat tar files exist."""
-        landsat_dir = Path("/Users/ziad/Documents/GitHub/ShallowLearn/data/landsat")
+        landsat_dir = Path("/mnt/sda_mount/Landsat_CH3/tm")
         assert landsat_dir.exists(), f"Landsat directory {landsat_dir} does not exist"
         
         tar_files = list(landsat_dir.glob("*.tar"))
-        assert len(tar_files) >= 2, f"Expected at least 2 Landsat tar files, found {len(tar_files)}"
+        assert len(tar_files) >= 1, f"Expected at least 1 Landsat tar file, found {len(tar_files)}"
         
-        # Check specific files mentioned in summary
-        lc09_file = landsat_dir / "LC09_L1TP_157046_20250228_20250228_02_T1.tar"
-        lt05_file = landsat_dir / "LT05_L1TP_218067_20110703_20200822_02_T1.tar"
+        # Check specific file mentioned in e2e tests
+        lt05_file = landsat_dir / "LT05_L1TP_157046_19920109_20200914_02_T1.tar"
         
-        assert lc09_file.exists(), f"Landsat 9 file {lc09_file} not found"
         assert lt05_file.exists(), f"Landsat 5 file {lt05_file} not found"
     
     def test_sentinel2_data_exists(self):
         """Verify Sentinel-2 zip file exists."""
-        sentinel2_dir = Path("/Users/ziad/Documents/GitHub/ShallowLearn/data/sentinel2")
+        sentinel2_dir = Path("/mnt/sda_mount/L1C_Full")
         assert sentinel2_dir.exists(), f"Sentinel-2 directory {sentinel2_dir} does not exist"
         
         zip_files = list(sentinel2_dir.glob("*.zip"))
         assert len(zip_files) >= 1, f"Expected at least 1 Sentinel-2 zip file, found {len(zip_files)}"
         
-        # Check specific file mentioned in summary
-        s2_file = sentinel2_dir / "S2A_MSIL1C_20250112T002701_N0511_R016_T55KDB_20250112T012829.SAFE.zip"
-        assert s2_file.exists(), f"Sentinel-2 file {s2_file} not found"
+        # Check specific files mentioned in e2e tests
+        s2_n0500_file = sentinel2_dir / "S2A_MSIL1C_20151124T003752_N0500_R059_T55LCD_20231009T132839.zip"
+        s2_n0400_file = sentinel2_dir / "S2A_MSIL1C_20221008T003711_N0400_R059_T55LCD_20221008T014306.zip"
+        
+        # Check that at least one of these files exists
+        assert s2_n0500_file.exists() or s2_n0400_file.exists(), f"Neither Sentinel-2 test file found in {sentinel2_dir}"
 
 
 class TestLandsatVRTBuilder:
@@ -350,7 +352,7 @@ class TestIntegrationWorkflows:
     
     def test_end_to_end_landsat_workflow(self):
         """Test complete Landsat processing workflow."""
-        landsat_dir = Path("/Users/ziad/Documents/GitHub/ShallowLearn/data/landsat")
+        landsat_dir = Path("/mnt/sda_mount/Landsat_CH3/tm")
         landsat_files = list(landsat_dir.glob("*.tar"))
         
         if not landsat_files:
@@ -373,7 +375,7 @@ class TestIntegrationWorkflows:
     
     def test_end_to_end_sentinel2_workflow(self):
         """Test complete Sentinel-2 processing workflow."""
-        sentinel2_dir = Path("/Users/ziad/Documents/GitHub/ShallowLearn/data/sentinel2")
+        sentinel2_dir = Path("/mnt/sda_mount/L1C_Full")
         sentinel2_files = list(sentinel2_dir.glob("*.zip"))
         
         if not sentinel2_files:
@@ -397,8 +399,8 @@ class TestIntegrationWorkflows:
     def test_batch_processing(self):
         """Test batch processing of multiple files."""
         # Get available files
-        landsat_dir = Path("/Users/ziad/Documents/GitHub/ShallowLearn/data/landsat")
-        sentinel2_dir = Path("/Users/ziad/Documents/GitHub/ShallowLearn/data/sentinel2")
+        landsat_dir = Path("/mnt/sda_mount/Landsat_CH3/tm")
+        sentinel2_dir = Path("/mnt/sda_mount/L1C_Full")
         
         landsat_files = list(landsat_dir.glob("*.tar"))[:1]  # Limit for speed
         sentinel2_files = list(sentinel2_dir.glob("*.zip"))[:1]
@@ -425,8 +427,8 @@ class TestIntegrationWorkflows:
             # Verify all VRTs were created
             assert len(created_vrts) == len(all_files)
             
-            # Test collection creation
-            collection = SatelliteImageCollection(created_vrts)
+            # Test collection creation using factory function
+            collection = create_satellite_collection(str(temp_path))
             assert len(collection) == len(all_files)
             
             # Verify each image loads correctly

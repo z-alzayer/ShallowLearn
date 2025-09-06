@@ -10,7 +10,9 @@ import os
 from PIL import Image
 
 import ShallowLearn.QuickLook as ql
-import ShallowLearn.Transform as trf 
+# Transform module removed - functions moved to core.array_utils
+# import ShallowLearn.Transform as trf
+from ShallowLearn.core.array_utils import LCE_multi 
 
 NUM_EXAMPLES = 20
 # --- Fixtures ---

@@ -1,4 +1,4 @@
-from ShallowLearn.LoadData import LoadGeoTIFF
+from ShallowLearn.io.satellite_data import LoadGeoTIFF
 
 class LabelLoader(LoadGeoTIFF):
 
