@@ -65,6 +65,29 @@ class SatelliteImage(ABC):
         """Check if band is present (not a placeholder)."""
         return self.band_status.get(band_name, False)
 
+    def get_metadata(self) -> Dict:
+        """Get image metadata."""
+        return self.meta if hasattr(self, 'meta') and self.meta else {}
+
+    def get_bounds(self):
+        """Get image bounds."""
+        if hasattr(self, 'meta') and self.meta and 'transform' in self.meta:
+            # Calculate bounds from transform and dimensions
+            transform = self.meta['transform']
+            width = self.meta['width']
+            height = self.meta['height']
+            
+            # Calculate corner coordinates
+            left = transform.c
+            top = transform.f
+            right = transform.c + width * transform.a
+            bottom = transform.f + height * transform.e
+            
+            # Return bounds in a format similar to rasterio.coords.BoundingBox
+            from rasterio.coords import BoundingBox
+            return BoundingBox(left=left, bottom=bottom, right=right, top=top)
+        return None
+
     def get_rgb_bands(self) -> Tuple[str, str, str]:
         """Get the typical RGB band combination for this satellite."""
         # Default implementation - should be overridden by subclasses
@@ -107,7 +130,8 @@ class LandsatImage(SatelliteImage):
             self.tags = src.tags()
             self.mtl_tags = src.tags(ns="MTL")
 
-            # Read all available bands
+            # Read bands individually to handle mixed dtypes in Landsat VRTs
+            # VRTs can contain spectral bands + metadata bands with different dtypes
             band_data = {}
             for i in range(src.count):
                 band_desc = (
@@ -116,8 +140,14 @@ class LandsatImage(SatelliteImage):
                 if band_desc in self.band_order:
                     if band_desc in band_data.keys():
                         continue
-                    band_data[band_desc] = src.read(i + 1)
-                    self.present_bands.add(band_desc)
+                    # Read individual band to handle mixed dtypes
+                    try:
+                        band_array = src.read(i + 1)
+                        band_data[band_desc] = band_array
+                        self.present_bands.add(band_desc)
+                    except Exception as e:
+                        print(f"Warning: Could not read band {band_desc}: {e}")
+                        continue
 
             # Create ordered array with placeholders for missing bands
             self._create_ordered_array(band_data)
@@ -132,14 +162,14 @@ class LandsatImage(SatelliteImage):
                 ordered_bands.append(band_data[band_name])
                 self.band_status[band_name] = True
             else:
-                # Create NaN placeholder with same shape/dtype as existing bands
+                # Create zero placeholder with same shape/dtype as existing bands
                 if band_data:
-                    placeholder = np.full_like(next(iter(band_data.values())), np.nan)
+                    first_band = next(iter(band_data.values()))
+                    placeholder = np.zeros_like(first_band)
                 else:
-                    placeholder = np.empty(
-                        (self.meta["height"], self.meta["width"]), dtype="float32"
+                    placeholder = np.zeros(
+                        (self.meta["height"], self.meta["width"]), dtype="uint16"
                     )
-                    placeholder[:] = np.nan
                 ordered_bands.append(placeholder)
                 self.band_status[band_name] = False
 
@@ -184,31 +214,113 @@ class Sentinel2Image(SatelliteImage):
         }
 
     def _load_image(self):
-        """Load Sentinel-2 image data from VRT file."""
+        """Load Sentinel-2 image data using subdatasets approach like original LoadSentinel2L1C."""
+        import zipfile
+        import os
+        
+        # Handle different input types
+        if str(self.path).endswith(".vrt"):
+            # Handle VRT files created by the VRT builder
+            self.is_vrt = True
+            with rio.open(self.path) as src:
+                # Store metadata
+                self.meta = src.meta.copy()
+                self.tags = src.tags()
+                
+                # Read bands individually to handle any mixed dtypes
+                band_data = {}
+                for i in range(src.count):
+                    band_desc = (
+                        src.descriptions[i] if src.descriptions[i] else f"Band_{i + 1}"
+                    )
+                    # Handle the naming convention (B2 vs B02)
+                    if band_desc.startswith('B') and len(band_desc) == 2:
+                        band_desc = f"B0{band_desc[1]}"
+                    
+                    if band_desc in self.band_order:
+                        try:
+                            band_array = src.read(i + 1)
+                            band_data[band_desc] = band_array
+                            self.present_bands.add(band_desc)
+                        except Exception as e:
+                            print(f"Warning: Could not read band {band_desc}: {e}")
+                            continue
 
-        # Temporary solution to extract metadata since rio doesnt seem to
-        # want to read it directly
-        sentinel_data = gdal.Open(str(self.path))
-        self.s2_tags = sentinel_data.GetMetadata("S2_METADATA")
-        sentinel_data = None
+                # Create ordered array with placeholders for missing bands
+                self._create_ordered_array(band_data)
+                return
+                
+        elif str(self.path).endswith(".zip"):
+            self.is_zip = True
+            with zipfile.ZipFile(self.path, 'r') as zip_ref:
+                files = [
+                    f for f in zip_ref.namelist()
+                    if "MTD_MSIL1C.xml" in f or "MTD_MSIL2A.xml" in f
+                ]
+            if len(files) != 1:
+                raise Exception("Multiple or no MTD files found in ZIP.")
+            
+            zip_path = f"/vsizip/{self.path}"
+            metadata_file = os.path.join(zip_path, files[0])
+        else:
+            # Handle .SAFE directories or direct XML files
+            self.is_zip = False
+            if str(self.path).endswith(".xml"):
+                metadata_file = str(self.path)
+            else:
+                # Assume it's a .SAFE directory - use simple file finding for now
+                # This avoids import issues with missing modules
+                from pathlib import Path
+                safe_path = Path(self.path)
+                mtd_files = list(safe_path.rglob("MTD_MSIL1C*.xml"))
+                if not mtd_files:
+                    mtd_files = list(safe_path.rglob("MTD_MSIL2A*.xml"))
+                if len(mtd_files) != 1:
+                    raise Exception(f"Found {len(mtd_files)} MTD files, expected 1")
+                metadata_file = str(mtd_files[0])
 
-        with rio.open(self.path) as src:
-            # Store metadata
-            self.meta = src.meta.copy()
-            self.tags = src.tags()
+        # Load subdatasets using the original approach
+        with rio.open(metadata_file) as dataset:
+            subdatasets = dataset.subdatasets
 
-            # Read all available bands
-            band_data = {}
-            for i in range(src.count):
-                band_desc = (
-                    src.descriptions[i] if src.descriptions[i] else f"Band_{i + 1}"
-                )
-                if band_desc in self.band_order:
-                    band_data[band_desc] = src.read(i + 1)
-                    self.present_bands.add(band_desc)
+        if not subdatasets:
+            raise ValueError("No subdatasets found in the Sentinel-2 file")
 
-            # Create ordered array with placeholders for missing bands
-            self._create_ordered_array(band_data)
+        # Get metadata from the first subdataset
+        with rio.open(subdatasets[0]) as ds:
+            self.tags = ds.tags()
+            self.meta = ds.meta.copy()
+            
+        # Use 10m resolution bands as default (like original implementation)
+        resolution_10m = [s for s in subdatasets if "10m" in s]
+        
+        if resolution_10m:
+            # Load the 10m resolution data
+            with rio.open(resolution_10m[0]) as src:
+                # Read all bands at once - this maintains original resolution
+                data = src.read()  # Shape: (bands, height, width)
+                
+                # Map bands based on descriptions
+                band_data = {}
+                for i in range(src.count):
+                    band_desc = (
+                        src.descriptions[i].split(",")[0] if src.descriptions[i] else f"Band_{i + 1}"
+                    )
+                    # Handle the naming convention (B2 vs B02)
+                    if band_desc.startswith('B') and len(band_desc) == 2:
+                        band_desc = f"B0{band_desc[1]}"
+                    
+                    if band_desc in self.band_order:
+                        band_data[band_desc] = data[i]
+                        self.present_bands.add(band_desc)
+
+                # Create ordered array with placeholders for missing bands
+                self._create_ordered_array(band_data)
+        else:
+            # Fallback: use the first available subdataset
+            with rio.open(subdatasets[0]) as src:
+                data = src.read()
+                self.image = np.transpose(data, (1, 2, 0))  # (height, width, bands)
 
     def _create_ordered_array(self, band_data: Dict[str, np.ndarray]):
         """Create ordered array with NaN placeholders for missing bands."""
@@ -220,14 +332,14 @@ class Sentinel2Image(SatelliteImage):
                 ordered_bands.append(band_data[band_name])
                 self.band_status[band_name] = True
             else:
-                # Create NaN placeholder
+                # Create zero placeholder (avoid NaN casting issues with integer dtypes)
                 if band_data:
-                    placeholder = np.full_like(next(iter(band_data.values())), np.nan)
+                    first_band = next(iter(band_data.values()))
+                    placeholder = np.zeros_like(first_band)
                 else:
-                    placeholder = np.empty(
-                        (self.meta["height"], self.meta["width"]), dtype="float32"
+                    placeholder = np.zeros(
+                        (self.meta["height"], self.meta["width"]), dtype="uint16"
                     )
-                    placeholder[:] = np.nan
                 ordered_bands.append(placeholder)
                 self.band_status[band_name] = False
 

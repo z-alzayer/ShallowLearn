@@ -172,18 +172,26 @@ class TestGeoTIFFPipeline:
 
         # Test new interface (disable clipping to match old behavior)
         new_data = load_image(
-            TestDataPaths.GBR_BENTHIC_SINGLE, orient=False, clip=False
+            TestDataPaths.GBR_BENTHIC_SINGLE, clip=False
         )  # Match old format
         new_data_meta, new_meta, new_bounds = load_image(
-            TestDataPaths.GBR_BENTHIC_SINGLE, return_meta=True, orient=False, clip=False
+            TestDataPaths.GBR_BENTHIC_SINGLE, return_meta=True, clip=False
         )
 
-        # Compare results (allowing for orientation differences)
-        assert old_data.shape == new_data.shape
+        # Compare results (accounting for new channels-last format)
+        # Old format: (bands, height, width), New format: (height, width, bands)
+        if len(old_data.shape) == 3:
+            # Transpose old data to match new channels-last format for comparison
+            old_data_transposed = np.transpose(old_data, (1, 2, 0))
+            assert old_data_transposed.shape == new_data.shape
+            assert np.array_equal(old_data_transposed, new_data)
+        else:
+            assert old_data.shape == new_data.shape
+            
         assert old_data.dtype == new_data.dtype
         assert old_meta["crs"] == new_meta["crs"]
 
-        print("✓ Backwards compatibility maintained")
+        print("✓ Backwards compatibility maintained (with channels-last format)")
 
 
 class TestSentinel2Pipeline:
