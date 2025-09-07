@@ -51,7 +51,7 @@ jobs:
       id: cache-venv
       with:
         path: .venv
-        key: venv-${{ runner.os }}-py${{ matrix.python-version }}-gdal${{ steps.gdal-version.outputs.version }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+        key: venv-${{ runner.os }}-py${{ matrix.python-version }}-gdal${{ steps.gdal-version.outputs.version }}-${{ hashFiles('pyproject.toml') }}
         restore-keys: |
           venv-${{ runner.os }}-py${{ matrix.python-version }}-gdal${{ steps.gdal-version.outputs.version }}-
 
