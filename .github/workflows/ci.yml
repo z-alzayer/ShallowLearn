@@ -13,12 +13,15 @@ jobs:
     container:
       # Use official GDAL container with GDAL pre-installed
       image: ghcr.io/osgeo/gdal:ubuntu-small-3.8.5
+      options: --user root
     strategy:
       matrix:
         python-version: ["3.10"]
     
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for proper git info
 
     - name: Install Python and build tools
       run: |
@@ -100,25 +103,17 @@ jobs:
           echo "❌ Coverage file not found"
           ls -la
         fi
-        
-        # Ensure git info is available for codecov
-        git config --global --add safe.directory "$GITHUB_WORKSPACE"
-        echo "Git info:"
-        git log -1 --oneline
-        echo "Current branch: $(git branch --show-current || echo 'detached')"
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
-      if: always()  # Upload even if tests failed
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        files: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
-        verbose: true
-        # Explicit git info for container environment
-        override_branch: ${{ github.ref_name }}
-        override_commit: ${{ github.sha }}
-        override_pr: ${{ github.event.pull_request.number }}
-        override_build: ${{ github.run_id }}
+      if: always()
+      run: |
+        # Use codecov uploader script which handles container environments better
+        curl -s https://codecov.io/bash | bash -s -- \
+          -t "${{ secrets.CODECOV_TOKEN }}" \
+          -f "./coverage.xml" \
+          -F "unittests" \
+          -n "codecov-umbrella" \
+          -B "${{ github.ref_name }}" \
+          -C "${{ github.sha }}" \
+          -b "${{ github.run_id }}" \
+          -v
