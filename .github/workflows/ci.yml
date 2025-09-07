@@ -100,6 +100,12 @@ jobs:
           echo "❌ Coverage file not found"
           ls -la
         fi
+        
+        # Ensure git info is available for codecov
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        echo "Git info:"
+        git log -1 --oneline
+        echo "Current branch: $(git branch --show-current || echo 'detached')"
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
@@ -111,3 +117,8 @@ jobs:
         name: codecov-umbrella
         fail_ci_if_error: false
         verbose: true
+        # Explicit git info for container environment
+        override_branch: ${{ github.ref_name }}
+        override_commit: ${{ github.sha }}
+        override_pr: ${{ github.event.pull_request.number }}
+        override_build: ${{ github.run_id }}
