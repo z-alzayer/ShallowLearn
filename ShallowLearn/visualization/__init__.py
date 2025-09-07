@@ -24,6 +24,8 @@ from .display import (
     plot_with_legend,
 )
 
+from .quicklook_viz import QuickLookVisualizer
+
 __all__ = [
     # Core functions
     'create_rgb_image',
@@ -43,4 +45,7 @@ __all__ = [
     # Utilities
     'add_north_arrow_to_axis',
     'plot_with_legend',
+    
+    # QuickLook visualization
+    'QuickLookVisualizer',
 ]

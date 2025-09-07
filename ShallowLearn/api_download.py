@@ -2,10 +2,25 @@
 import abc
 from datetime import date
 import os
+from pathlib import Path
 from shapely.geometry import box
+
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    # Look for .env file in the current directory or parent directories
+    dotenv_path = Path(__file__).parent.parent / '.env'
+    if dotenv_path.exists():
+        load_dotenv(dotenv_path)
+    else:
+        load_dotenv()  # Try to find .env in current working directory
+except ImportError:
+    print("Warning: python-dotenv not installed. Using system environment variables only.")
+    print("Install with: pip install python-dotenv")
 
 class Creds:
     def __init__(self):
+        self.landsat_token = os.getenv('LSAT_TOKEN')
         self.landsat_username = os.getenv('LSAT_USER')
         self.landsat_password = os.getenv('LSAT_PASS')
         self.sentinel_username = os.getenv('SEN_USER')
@@ -13,6 +28,7 @@ class Creds:
 
     def as_dict(self):
         return {
+            'landsat_token': self.landsat_token,
             'landsat_username': self.landsat_username,
             'landsat_password': self.landsat_password,
             'sentinel_username': self.sentinel_username,

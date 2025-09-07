@@ -36,6 +36,31 @@ class SatelliteProduct:
     download_url: Optional[str] = None
     bounds: Optional[Dict] = None
     metadata: Optional[Dict] = None
+    
+    # Sentinel-2 specific metadata fields
+    orbit_number: Optional[int] = None
+    relative_orbit_number: Optional[int] = None
+    processing_baseline: Optional[str] = None
+    product_type: Optional[str] = None
+    platform: Optional[str] = None
+    instrument: Optional[str] = None
+    timeliness: Optional[str] = None
+    snow_cover: Optional[float] = None
+    orbit_direction: Optional[str] = None
+    
+    # Landsat specific metadata fields  
+    wrs_path: Optional[int] = None
+    wrs_row: Optional[int] = None
+    scene_id: Optional[str] = None
+    spacecraft_id: Optional[str] = None
+    sensor_id: Optional[str] = None
+    sun_azimuth: Optional[float] = None
+    sun_elevation: Optional[float] = None
+    earth_sun_distance: Optional[float] = None
+    collection_number: Optional[str] = None
+    collection_category: Optional[str] = None
+    image_quality: Optional[str] = None
+    geometric_rmse: Optional[float] = None
 
     def to_dict(self) -> Dict:
         return {
@@ -47,7 +72,30 @@ class SatelliteProduct:
             'processing_level': self.processing_level,
             'thumbnail_url': self.thumbnail_url,
             'download_url': self.download_url,
-            'bounds': self.bounds
+            'bounds': self.bounds,
+            # Sentinel-2 fields
+            'orbit_number': self.orbit_number,
+            'relative_orbit_number': self.relative_orbit_number,
+            'processing_baseline': self.processing_baseline,
+            'product_type': self.product_type,
+            'platform': self.platform,
+            'instrument': self.instrument,
+            'timeliness': self.timeliness,
+            'snow_cover': self.snow_cover,
+            'orbit_direction': self.orbit_direction,
+            # Landsat fields
+            'wrs_path': self.wrs_path,
+            'wrs_row': self.wrs_row,
+            'scene_id': self.scene_id,
+            'spacecraft_id': self.spacecraft_id,
+            'sensor_id': self.sensor_id,
+            'sun_azimuth': self.sun_azimuth,
+            'sun_elevation': self.sun_elevation,
+            'earth_sun_distance': self.earth_sun_distance,
+            'collection_number': self.collection_number,
+            'collection_category': self.collection_category,
+            'image_quality': self.image_quality,
+            'geometric_rmse': self.geometric_rmse
         }
 
 
@@ -107,6 +155,44 @@ class LandsatUSGSDownloader:
         if output.get('errorCode'):
             raise Exception(f"{output['errorCode']}: {output['errorMessage']}")
         return output['data']
+    
+    def _extract_landsat_metadata(self, scene: Dict) -> Dict:
+        """Extract and standardize Landsat-specific metadata fields"""
+        metadata_dict = {}
+        
+        # Convert metadata list to dictionary
+        if 'metadata' in scene and isinstance(scene['metadata'], list):
+            for item in scene['metadata']:
+                if 'fieldName' in item and 'value' in item:
+                    metadata_dict[item['fieldName']] = item['value']
+        
+        # Extract key fields with safe conversion
+        def safe_int(value):
+            try:
+                return int(float(value)) if value else None
+            except (ValueError, TypeError):
+                return None
+                
+        def safe_float(value):
+            try:
+                return float(value) if value else None
+            except (ValueError, TypeError):
+                return None
+        
+        return {
+            'wrs_path': safe_int(metadata_dict.get('WRS_PATH')),
+            'wrs_row': safe_int(metadata_dict.get('WRS_ROW')),
+            'scene_id': metadata_dict.get('LANDSAT_SCENE_ID'),
+            'spacecraft_id': metadata_dict.get('SPACECRAFT_ID'),
+            'sensor_id': metadata_dict.get('SENSOR_ID'),
+            'sun_azimuth': safe_float(metadata_dict.get('SUN_AZIMUTH')),
+            'sun_elevation': safe_float(metadata_dict.get('SUN_ELEVATION')),
+            'earth_sun_distance': safe_float(metadata_dict.get('EARTH_SUN_DISTANCE')),
+            'collection_number': metadata_dict.get('Collection Number'),
+            'collection_category': metadata_dict.get('Collection Category'),
+            'image_quality': metadata_dict.get('IMAGE_QUALITY_OLI') or metadata_dict.get('IMAGE_QUALITY_TIRS'),
+            'geometric_rmse': safe_float(metadata_dict.get('GEOMETRIC_RMSE_MODEL'))
+        }
     
     def _convert_geometry_to_mbr(self, geometry) -> Dict:
         """Convert geometry to USGS MBR format"""
@@ -171,14 +257,15 @@ class LandsatUSGSDownloader:
             for scene in scenes['results']:
                 # Extract sensor type from entity ID
                 entity_id = scene.get('entityId', '')
-                if entity_id.startswith('LC08') or entity_id.startswith('LC09'):
+                if entity_id.startswith('LC08') or entity_id.startswith('LC09') or entity_id.startswith('LC8') or entity_id.startswith('LC9'):
                     sensor = 'OLI/TIRS'
-                elif entity_id.startswith('LE07'):
+                elif entity_id.startswith('LE07') or entity_id.startswith('LC7'):
                     sensor = 'ETM+'
-                elif entity_id.startswith('LT05') or entity_id.startswith('LT04'):
+                elif entity_id.startswith('LT05') or entity_id.startswith('LT04') or entity_id.startswith('LC5') or entity_id.startswith('LC4'):
                     sensor = 'TM'
                 else:
-                    sensor = 'Unknown'
+                    # Default to most common modern sensor for unknown patterns
+                    sensor = 'OLI/TIRS'
                 
                 # Look for browse/thumbnail URL in various possible locations
                 thumbnail_url = None
@@ -189,16 +276,40 @@ class LandsatUSGSDownloader:
                     elif isinstance(browse_info, list) and len(browse_info) > 0:
                         thumbnail_url = browse_info[0].get('browsePath') or browse_info[0].get('browseUrl')
                 
+                # Extract Landsat-specific metadata
+                landsat_metadata = self._extract_landsat_metadata(scene)
+                
+                # Format acquisition date to match Sentinel-2 format (with timezone and microseconds)
+                raw_date = scene.get('temporalCoverage', {}).get('startDate')
+                if raw_date:
+                    # Convert to ISO format with microseconds to match Sentinel-2
+                    # "2023-06-11 00:00:00" -> "2023-06-11T00:00:00.000000Z"
+                    if ' ' in raw_date:
+                        acquisition_date = raw_date.replace(' ', 'T') + '.000000Z'
+                    elif not '.' in raw_date:
+                        # Add microseconds if missing
+                        if raw_date.endswith('Z'):
+                            acquisition_date = raw_date[:-1] + '.000000Z'
+                        else:
+                            acquisition_date = raw_date + '.000000Z'
+                    else:
+                        acquisition_date = raw_date
+                else:
+                    acquisition_date = None
+                
                 product = SatelliteProduct(
                     product_id=scene.get('entityId'),
                     satellite='landsat',
                     sensor=sensor,
-                    acquisition_date=scene.get('temporalCoverage', {}).get('startDate'),
+                    acquisition_date=acquisition_date,
                     cloud_cover=float(scene.get('cloudCover', 0)),
                     processing_level=query.processing_level,
                     thumbnail_url=thumbnail_url,
                     bounds=scene.get('spatialBounds'),
-                    metadata=scene
+                    metadata=scene,
+                    
+                    # Landsat-specific metadata fields
+                    **landsat_metadata
                 )
                 products.append(product)
             
@@ -221,7 +332,7 @@ class LandsatUSGSDownloader:
         api_key = self._send_request("login-token", payload)
         
         try:
-            # Step 2: Get download options for the scene
+            # Step 2: Get download options (exact BarAlHikman approach)
             payload = {
                 'datasetName': self.datasets.get(product.processing_level, 'landsat_ot_c2_l1'),
                 'entityIds': [product.product_id]
@@ -229,59 +340,51 @@ class LandsatUSGSDownloader:
             
             download_options = self._send_request("download-options", payload, api_key)
             
-            if not download_options:
-                raise Exception(f"No download options available for {product.product_id}")
-            
-            # Find available download option - matches BarAlHikman logic
-            download_option = None
+            # Step 3: Find available products (exact BarAlHikman logic)
+            downloads = []
             for option in download_options:
                 if option.get('available'):
-                    download_option = option
-                    break
-                        
-            if not download_option:
-                raise Exception(f"No available download options for {product.product_id}")
+                    downloads.append({'entityId': option['entityId'], 'productId': option['id']})
             
-            # Step 3: Request download with label (BarAlHikman pattern)
+            if not downloads:
+                raise Exception(f"No available products to download for {product.product_id}")
+            
+            # Step 4: Request downloads (exact BarAlHikman approach)
             label = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            payload = {
-                'downloads': [{'entityId': product.product_id, 'productId': download_option['id']}],
-                'label': label
-            }
+            payload = {'downloads': downloads, 'label': label}
             
             request_results = self._send_request("download-request", payload, api_key)
             
-            # Step 4: Handle download availability (matches BarAlHikman)
+            # Step 5: Handle download availability (exact BarAlHikman logic)
             download_url = None
             
-            # If downloads are preparing, poll until ready
+            # If downloads are preparing, poll until ready (BarAlHikman approach)
             if request_results.get('preparingDownloads'):
                 print(f"Download preparing for {product.product_id}...")
                 payload = {'label': label}
-                max_attempts = 10  # Limit polling attempts
-                attempt = 0
                 
-                while attempt < max_attempts:
-                    more_downloads = self._send_request("download-retrieve", payload, api_key)
-                    available = more_downloads.get('available', [])
+                while True:
+                    more_download_urls = self._send_request("download-retrieve", payload, api_key)
+                    available = more_download_urls.get('available', [])
                     
                     if available:
                         download_url = available[0]['url']
                         break
                         
+                    # Check if we have enough downloads (BarAlHikman logic)
+                    if len(available) >= len(downloads):
+                        break
+                        
                     print("Waiting for downloads to become available...")
                     time.sleep(30)
-                    attempt += 1
-                
-                if not download_url:
-                    raise Exception(f"Download did not become available for {product.product_id}")
             else:
-                # Download immediately available
+                # Downloads immediately available (BarAlHikman approach)
                 available_downloads = request_results.get('availableDownloads', [])
                 if available_downloads:
                     download_url = available_downloads[0]['url']
-                else:
-                    raise Exception(f"No download URL available for {product.product_id}")
+                
+            if not download_url:
+                raise Exception(f"No download URL available for {product.product_id}")
             
             # Step 5: Download the file using requests (BarAlHikman pattern)
             response = requests.get(download_url, stream=True)
@@ -375,7 +478,8 @@ class Sentinel2CDSEDownloader:
         
         print(f"Found {len(features)} Sentinel-2 scenes")
         
-        # Convert to standardized format
+        # Convert to standardized format (limit results since cdsetool doesn't always respect maxRecords)
+        features = features[:query.max_results]
         products = []
         for feature in features:
             props = feature['properties']
@@ -390,7 +494,18 @@ class Sentinel2CDSEDownloader:
                 thumbnail_url=props.get('thumbnail'),
                 download_url=props.get('services', {}).get('download', {}).get('url'),
                 bounds=feature.get('geometry'),
-                metadata=feature
+                metadata=feature,
+                
+                # Enhanced metadata fields
+                orbit_number=props.get('orbitNumber'),
+                relative_orbit_number=props.get('relativeOrbitNumber'),
+                processing_baseline=props.get('processingBaseline'),
+                product_type=props.get('productType'),
+                platform=props.get('platform', '').replace('S2A', 'Sentinel-2A').replace('S2B', 'Sentinel-2B'),
+                instrument=props.get('instrument'),
+                timeliness=props.get('timeliness'),
+                snow_cover=props.get('snowCover'),
+                orbit_direction=props.get('orbitDirection')
             )
             products.append(product)
         
@@ -401,14 +516,12 @@ class Sentinel2CDSEDownloader:
         try:
             from cdsetool.download import download_features
             from cdsetool.credentials import Credentials
+            from cdsetool.monitor import StatusMonitor
         except ImportError:
             raise Exception("cdsetool not available. Cannot download Sentinel-2 products.")
         
         import os
         from pathlib import Path
-        
-        # Use stored credentials
-        creds = Credentials(username=self.username, password=self.password)
         
         # The product metadata should contain download info
         if not product.metadata:
@@ -423,30 +536,43 @@ class Sentinel2CDSEDownloader:
             print(f"Downloading {product.product_id}...")
             
             # Download using cdsetool - matches existing ShallowLearn pattern
-            # Use cdsetool credentials for authentication
-            creds = Credentials(username=self.username, password=self.password)
+            # Create config with credentials (no monitor in threads)
+            config = {
+                "concurrency": 1,  # Single file download
+                "credentials": Credentials(self.username, self.password),
+            }
             
-            # Set up credentials globally (cdsetool pattern)
-            import cdsetool
-            cdsetool.credentials.default_credentials = creds
+            # Download features returns a generator - consume it with list()
+            download_results = list(download_features(features, output_dir, config))
             
-            download_features(features, output_dir)
-            
-            # Find the downloaded file
-            downloaded_files = list(Path(output_dir).glob(f"{product.product_id}*"))
-            if downloaded_files:
-                file_path = str(downloaded_files[0])
-                print(f"Downloaded {product.product_id}")
-                return file_path
-            else:
-                # Check for .zip files that might match
-                zip_files = list(Path(output_dir).glob("*.zip"))
-                if zip_files:
-                    # Return the most recent zip file as a fallback
-                    latest_zip = max(zip_files, key=os.path.getctime)
-                    return str(latest_zip)
+            # Check if download was successful
+            if download_results:
+                # Find the downloaded file
+                downloaded_files = list(Path(output_dir).glob(f"{product.product_id}*"))
+                if downloaded_files:
+                    file_path = str(downloaded_files[0])
+                    print(f"Downloaded {product.product_id}")
+                    return file_path
                 else:
-                    raise Exception(f"Download completed but file not found in {output_dir}")
+                    # Check for .zip files that might match
+                    zip_files = list(Path(output_dir).glob("*.zip"))
+                    if zip_files:
+                        # Return the most recent zip file as a fallback
+                        latest_zip = max(zip_files, key=os.path.getctime)
+                        print(f"Downloaded {product.product_id} as {latest_zip.name}")
+                        return str(latest_zip)
+                    else:
+                        # Check for any files at all
+                        all_files = list(Path(output_dir).glob("*"))
+                        if all_files:
+                            # Return the most recent file
+                            latest_file = max(all_files, key=os.path.getctime)
+                            print(f"Downloaded {product.product_id} as {latest_file.name}")
+                            return str(latest_file)
+                        else:
+                            raise Exception(f"Download completed but no files found in {output_dir}")
+            else:
+                raise Exception(f"Download did not return any results for {product.product_id}")
                     
         except Exception as e:
             raise Exception(f"Download failed for {product.product_id}: {str(e)}")
@@ -547,6 +673,149 @@ class UnifiedSatelliteAPI:
             thread.join()
             
         return results
+    
+    def quicklook_filter(self, products: List[SatelliteProduct], config=None) -> Dict[str, List[SatelliteProduct]]:
+        """Apply QuickLook filtering to products based on thumbnails
+        
+        Args:
+            products: List of SatelliteProduct objects
+            config: Optional QuickLookConfig for customization
+            
+        Returns:
+            Dictionary with cluster names as keys and filtered product lists as values
+        """
+        from ..ml import QuickLookFilter, QuickLookConfig
+        
+        if config is None:
+            config = QuickLookConfig()
+        
+        filter_system = QuickLookFilter(config)
+        clusters = filter_system.process_products(products)
+        
+        # Print summary
+        summary = filter_system.get_clustering_summary()
+        print("\nQuickLook Clustering Summary:")
+        for cluster_name, count in summary.items():
+            print(f"  {cluster_name}: {count} products")
+        
+        return clusters
+    
+    def filter_by_clusters(self, products: List[SatelliteProduct], clusters: Dict[str, List[SatelliteProduct]], 
+                          target_clusters: List[str]) -> List[SatelliteProduct]:
+        """Filter products by specific cluster names
+        
+        Args:
+            products: Original list of products
+            clusters: Dictionary with cluster names as keys and product lists as values
+            target_clusters: List of cluster names to include
+            
+        Returns:
+            Filtered list of products from selected clusters
+        """
+        filtered_products = []
+        
+        for cluster_name in target_clusters:
+            if cluster_name in clusters:
+                filtered_products.extend(clusters[cluster_name])
+                print(f"✓ Added {len(clusters[cluster_name])} products from '{cluster_name}' cluster")
+            else:
+                print(f"⚠️ Cluster '{cluster_name}' not found. Available clusters: {list(clusters.keys())}")
+        
+        print(f"\n📊 Filtering summary:")
+        print(f"   • Total products: {len(products)}")
+        print(f"   • Filtered products: {len(filtered_products)}")
+        print(f"   • Selection ratio: {len(filtered_products)/len(products)*100:.1f}%")
+        
+        return filtered_products
+    
+    def create_download_manifest(self, products: List[SatelliteProduct], output_path: str = "download_manifest.csv") -> str:
+        """Create a CSV manifest of products for download tracking
+        
+        Args:
+            products: List of products to include in manifest
+            output_path: Path to save the manifest CSV file
+            
+        Returns:
+            Path to the created manifest file
+        """
+        try:
+            import pandas as pd
+        except ImportError:
+            raise ImportError("pandas is required for manifest creation. Install with: pip install pandas")
+        
+        manifest_data = []
+        for product in products:
+            manifest_data.append({
+                'product_id': product.product_id,
+                'satellite': product.satellite,
+                'acquisition_date': product.acquisition_date,
+                'cloud_cover': product.cloud_cover,
+                'download_url': product.download_url,
+                'thumbnail_url': getattr(product, 'thumbnail_url', ''),
+                'bounds': str(product.bounds) if product.bounds else '',
+                'processing_level': getattr(product, 'processing_level', ''),
+                'orbit_number': getattr(product, 'orbit_number', ''),
+                'relative_orbit_number': getattr(product, 'relative_orbit_number', ''),
+                'wrs_path': getattr(product, 'wrs_path', ''),
+                'wrs_row': getattr(product, 'wrs_row', ''),
+                'local_filename': f"{product.product_id}.zip"
+            })
+        
+        df = pd.DataFrame(manifest_data)
+        df.to_csv(output_path, index=False)
+        
+        print(f"📋 Download manifest created: {output_path}")
+        print(f"   • Products: {len(products)}")
+        print(f"   • Columns: {len(df.columns)}")
+        
+        return output_path
+    
+    def search_and_filter(self, query: SatelliteQuery, quicklook_config=None) -> Dict[str, List[SatelliteProduct]]:
+        """Combined search and QuickLook filtering workflow
+        
+        Args:
+            query: SatelliteQuery object
+            quicklook_config: Optional QuickLookConfig
+            
+        Returns:
+            Dictionary with cluster names as keys and filtered product lists as values
+        """
+        # First search for products
+        products = self.search(query)
+        
+        if not products:
+            print("No products found to filter")
+            return {}
+        
+        print(f"\nApplying QuickLook filtering to {len(products)} products...")
+        
+        # Apply QuickLook filtering
+        return self.quicklook_filter(products, quicklook_config)
+    
+    def products_to_dataframe(self, products: List[SatelliteProduct]) -> 'pd.DataFrame':
+        """Convert list of satellite products to pandas DataFrame for analysis"""
+        try:
+            import pandas as pd
+        except ImportError:
+            raise ImportError("pandas is required for DataFrame conversion. Install with: pip install pandas")
+        
+        if not products:
+            return pd.DataFrame()
+        
+        # Convert products to list of dictionaries
+        data = [product.to_dict() for product in products]
+        df = pd.DataFrame(data)
+        
+        # Convert date strings to datetime for better analysis
+        if 'acquisition_date' in df.columns:
+            # Use utc=True to handle mixed timezone formats
+            df['acquisition_date'] = pd.to_datetime(df['acquisition_date'], errors='coerce', utc=True)
+            
+        # Sort by acquisition date for better organization
+        if 'acquisition_date' in df.columns:
+            df = df.sort_values('acquisition_date').reset_index(drop=True)
+        
+        return df
 
 
 def test_against_existing_parameters():
