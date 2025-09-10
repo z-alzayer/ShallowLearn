@@ -688,6 +688,160 @@ def test_vrt_with_random_crop():
                     print("Cropping test passed successfully!")
 
 
+def test_vrt_bounds_validation():
+    """Test that VRT builder properly validates bounds and rejects non-intersecting crops."""
+    import geopandas as gpd
+    from shapely.geometry import Polygon
+    
+    sentinel2_dir = Path("/mnt/sda_mount/L1C_Full")
+    sentinel2_files = list(sentinel2_dir.glob("*.zip"))[:1]
+    
+    if not sentinel2_files:
+        pytest.skip("No Sentinel-2 files available")
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        
+        # Test with Sentinel-2 file
+        zip_file = sentinel2_files[0]
+        print(f"\\nTesting bounds validation with {zip_file.name}")
+        
+        builder = Sentinel2VRTBuilder(str(temp_path))
+        
+        # First, get the actual image bounds
+        full_vrt_path = builder.build_vrt(str(zip_file))
+        
+        with rasterio.open(full_vrt_path) as src:
+            image_bounds = src.bounds
+            image_crs = src.crs
+            
+            print(f"Image bounds: {image_bounds}")
+            print(f"Image CRS: {image_crs}")
+        
+        # Test 1: Create bounds that DO intersect (should succeed)
+        intersecting_bounds = gpd.GeoDataFrame(
+            [1],
+            geometry=[Polygon([
+                (image_bounds.left + 1000, image_bounds.bottom + 1000),
+                (image_bounds.left + 2000, image_bounds.bottom + 1000),
+                (image_bounds.left + 2000, image_bounds.bottom + 2000),
+                (image_bounds.left + 1000, image_bounds.bottom + 2000),
+                (image_bounds.left + 1000, image_bounds.bottom + 1000)
+            ])],
+            crs=image_crs
+        )
+        
+        print("\\n1️⃣ Testing with intersecting bounds...")
+        intersecting_vrt = builder.build_vrt(str(zip_file), bounds=intersecting_bounds)
+        assert intersecting_vrt is not None, "VRT creation should succeed for intersecting bounds"
+        print(f"✅ VRT created successfully: {Path(intersecting_vrt).name}")
+        
+        # Verify the created VRT has reasonable dimensions
+        with rasterio.open(intersecting_vrt) as src:
+            assert src.width < 1000 and src.height < 1000, "Cropped VRT should be small"
+            print(f"✅ Cropped VRT dimensions: {src.width} x {src.height}")
+        
+        # Test 2: Create bounds that do NOT intersect (should return None)
+        non_intersecting_bounds = gpd.GeoDataFrame(
+            [1], 
+            geometry=[Polygon([
+                (image_bounds.right + 10000, image_bounds.top + 10000),
+                (image_bounds.right + 11000, image_bounds.top + 10000),
+                (image_bounds.right + 11000, image_bounds.top + 11000),
+                (image_bounds.right + 10000, image_bounds.top + 11000),
+                (image_bounds.right + 10000, image_bounds.top + 10000)
+            ])],
+            crs=image_crs
+        )
+        
+        print("\\n2️⃣ Testing with non-intersecting bounds...")
+        non_intersecting_vrt = builder.build_vrt(str(zip_file), bounds=non_intersecting_bounds)
+        assert non_intersecting_vrt is None, "VRT creation should return None for non-intersecting bounds"
+        print("✅ VRT creation correctly rejected for non-intersecting bounds")
+        
+        # Test 3: Create bounds in different CRS that don't intersect (should also return None)
+        # Create bounds in WGS84 that are far from the image
+        wgs84_non_intersecting = gpd.GeoDataFrame(
+            [1],
+            geometry=[Polygon([
+                (0.0, 0.0),  # Somewhere near Africa (far from Australia)
+                (0.1, 0.0),
+                (0.1, 0.1),
+                (0.0, 0.1),
+                (0.0, 0.0)
+            ])],
+            crs='EPSG:4326'
+        )
+        
+        print("\\n3️⃣ Testing with non-intersecting bounds in different CRS...")
+        different_crs_vrt = builder.build_vrt(str(zip_file), bounds=wgs84_non_intersecting)
+        assert different_crs_vrt is None, "VRT creation should return None for non-intersecting bounds in different CRS"
+        print("✅ VRT creation correctly rejected for non-intersecting bounds in different CRS")
+
+
+def test_l2a_auxiliary_bands_filtering():
+    """Test that L2A auxiliary bands can be included/excluded properly."""
+    import geopandas as gpd
+    from shapely.geometry import Polygon
+    
+    sentinel2_dir = Path("/mnt/sda_mount/L2A_Full")
+    sentinel2_files = list(sentinel2_dir.glob("*.zip"))[:1]
+    
+    if not sentinel2_files:
+        pytest.skip("No Sentinel-2 L2A files available")
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        
+        zip_file = sentinel2_files[0]
+        print(f"\\nTesting L2A auxiliary bands with {zip_file.name}")
+        
+        # Test 1: Default behavior (exclude auxiliary bands)
+        print("1️⃣ Testing default behavior (exclude auxiliary bands)...")
+        builder_default = Sentinel2VRTBuilder(str(temp_path), include_auxiliary_bands=False)
+        
+        # Get band files and check filtering
+        band_files_default = builder_default._get_band_files(str(zip_file))
+        auxiliary_count_default = sum(1 for f in band_files_default 
+                                     if any(aux in os.path.basename(f) for aux in ['AOT', 'WVP', 'SCL']))
+        
+        print(f"   Total bands: {len(band_files_default)}")
+        print(f"   Auxiliary bands: {auxiliary_count_default}")
+        assert auxiliary_count_default == 0, "Should exclude auxiliary bands by default"
+        
+        # Create VRT and test loading
+        vrt_default = builder_default.build_vrt(str(zip_file))
+        assert vrt_default is not None, "VRT creation should succeed"
+        
+        # Test loading the VRT
+        with rasterio.open(vrt_default) as src:
+            print(f"   VRT dimensions: {src.width} x {src.height}")
+            print(f"   VRT band count: {src.count}")
+            
+            # Should have reasonable number of bands (around 12-13 for spectral only)
+            assert src.count <= 15, f"Too many bands ({src.count}) - should be ~12-13 for spectral only"
+            assert src.count >= 10, f"Too few bands ({src.count}) - should have at least 10 spectral bands"
+        
+        # Test 2: Include auxiliary bands
+        print("2️⃣ Testing with auxiliary bands included...")
+        builder_with_aux = Sentinel2VRTBuilder(str(temp_path), include_auxiliary_bands=True)
+        
+        band_files_with_aux = builder_with_aux._get_band_files(str(zip_file))
+        auxiliary_count_with_aux = sum(1 for f in band_files_with_aux 
+                                      if any(aux in os.path.basename(f) for aux in ['AOT', 'WVP', 'SCL']))
+        
+        print(f"   Total bands: {len(band_files_with_aux)}")
+        print(f"   Auxiliary bands: {auxiliary_count_with_aux}")
+        
+        # Should include auxiliary bands now
+        assert auxiliary_count_with_aux > 0, "Should include auxiliary bands when requested"
+        assert len(band_files_with_aux) > len(band_files_default), "Should have more bands when including auxiliary"
+        
+        print(f"✅ L2A auxiliary bands filtering works correctly")
+        print(f"   Default: {len(band_files_default)} bands (0 auxiliary)")
+        print(f"   With auxiliary: {len(band_files_with_aux)} bands ({auxiliary_count_with_aux} auxiliary)")
+
+
 if __name__ == "__main__":
     # Run tests with verbose output
     pytest.main([__file__, "-v", "-s"])

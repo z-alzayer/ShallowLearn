@@ -126,15 +126,19 @@ def _detect_file_format(path: Path) -> str:
     """
     filename = path.name.upper()
 
-    # Check for Sentinel-2 patterns
+    # Check file extension first - VRT files should always use geotiff loader
+    if path.suffix.lower() in [".vrt"]:
+        return "geotiff"
+
+    # Check for Sentinel-2 patterns first (before checking TIF extension)
     if any(pattern in filename for pattern in ["S2A_", "S2B_", "MSIL1C", "MSIL2A"]):
         return "sentinel2"
 
-    # Check for Landsat patterns
+    # Check for Landsat patterns first (before checking TIF extension)
     if any(pattern in filename for pattern in ["LC08", "LC09", "LE07", "LT05", "LT04"]):
         return "landsat"
 
-    # Check file extension
+    # Check file extension for standard geotiff files (after pattern matching)
     if path.suffix.lower() in [".tif", ".tiff"]:
         return "geotiff"
 

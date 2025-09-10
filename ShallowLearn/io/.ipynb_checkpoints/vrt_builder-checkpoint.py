@@ -352,23 +352,6 @@ class LandsatVRTBuilder(VRTBuilder):
 class Sentinel2VRTBuilder(VRTBuilder):
     """VRT builder for Sentinel-2 ZIP archives using MTD XML subdatasets."""
 
-    def __init__(self, output_dir: str, project_name: str = "Satellite Processing", include_auxiliary_bands: bool = False):
-        """
-        Initialize Sentinel-2 VRT Builder.
-        
-        Parameters:
-        -----------
-        output_dir : str
-            Output directory for VRT files
-        project_name : str
-            Project name for metadata
-        include_auxiliary_bands : bool, default False
-            Whether to include auxiliary bands (AOT, WVP, SCL) in VRTs.
-            If False, only spectral bands (B01-B12, B8A) are included.
-        """
-        super().__init__(output_dir, project_name)
-        self.include_auxiliary_bands = include_auxiliary_bands
-
     def build_vrt(
         self,
         archive_path: str,
@@ -448,16 +431,16 @@ class Sentinel2VRTBuilder(VRTBuilder):
                             if aot_elem is not None and aot_elem.text:
                                 metadata['AOT_RETRIEVAL_METHOD'] = aot_elem.text
 
-        # Filter bands to target resolution to avoid duplicates and mixed dtypes
-        target_resolution_bands = self._filter_by_resolution(band_files, target_resolution)
-        if not target_resolution_bands:
-            raise RuntimeError(f"No bands found for target resolution {target_resolution}")
+        # Get the highest resolution bands to use as reference grid
+        reference_bands = self._filter_by_resolution(band_files, target_resolution)
+        if not reference_bands:
+            raise RuntimeError(f"No reference bands found for resolution {target_resolution}")
 
-        # Build /vsizip/ paths for TARGET RESOLUTION bands only
-        vsi_paths = [f"/vsizip/{archive_path}/{band_file}" for band_file in target_resolution_bands]
+        # Build /vsizip/ paths for ALL bands
+        vsi_paths = [f"/vsizip/{archive_path}/{band_file}" for band_file in band_files]
         
         # Get reference band info - just open once quickly
-        ref_vsi_path = f"/vsizip/{archive_path}/{target_resolution_bands[0]}"
+        ref_vsi_path = f"/vsizip/{archive_path}/{reference_bands[0]}"
         ref_ds = gdal.Open(ref_vsi_path)
         if not ref_ds:
             raise RuntimeError(f"Could not open reference band: {ref_vsi_path}")
@@ -486,21 +469,6 @@ class Sentinel2VRTBuilder(VRTBuilder):
                 ulx, uly, lrx, lry = self.transform_bounds(
                     expanded_bounds, bounds_crs, str(raster_crs)
                 )
-            
-            # Calculate image bounds in raster CRS
-            image_left = target_transform[0]
-            image_top = target_transform[3]
-            image_right = target_transform[0] + target_width * target_transform[1]
-            image_bottom = target_transform[3] + target_height * target_transform[5]
-            
-            # Validate that crop bounds intersect with image bounds
-            if not self._validate_bounds_intersection(
-                crop_bounds=(ulx, uly, lrx, lry),
-                image_bounds=(image_left, image_top, image_right, image_bottom),
-                archive_path=archive_path
-            ):
-                # Return None to indicate no VRT should be created
-                return None
             
             # Create VRT with cropping and resampling in one step
             vrt_options = gdal.BuildVRTOptions(
@@ -533,7 +501,7 @@ class Sentinel2VRTBuilder(VRTBuilder):
         
         # Add metadata to VRT (lightweight - no subdataset opening)  
         self._add_metadata_to_vrt_fast(
-            str(final_vrt_path), metadata, target_resolution_bands, str(archive_path)
+            str(final_vrt_path), metadata, band_files, str(archive_path)
         )
         
         print(f"Created: {final_vrt_path}")
@@ -573,49 +541,6 @@ class Sentinel2VRTBuilder(VRTBuilder):
 
         vrt_ds = None
 
-    def _validate_bounds_intersection(
-        self, 
-        crop_bounds: Tuple[float, float, float, float],
-        image_bounds: Tuple[float, float, float, float],
-        archive_path: str
-    ) -> bool:
-        """
-        Validate that crop bounds intersect with image bounds.
-        
-        Parameters:
-        -----------
-        crop_bounds : tuple
-            Crop bounds as (ulx, uly, lrx, lry)
-        image_bounds : tuple  
-            Image bounds as (left, top, right, bottom)
-        archive_path : str
-            Path to archive for error reporting
-            
-        Returns:
-        --------
-        bool
-            True if bounds intersect, False otherwise
-        """
-        crop_ulx, crop_uly, crop_lrx, crop_lry = crop_bounds
-        img_left, img_top, img_right, img_bottom = image_bounds
-        
-        # Check for intersection (rectangles overlap if they don't NOT overlap)
-        no_overlap = (
-            crop_lrx <= img_left or  # crop is to the left of image
-            crop_ulx >= img_right or  # crop is to the right of image
-            crop_lry >= img_top or    # crop is above image  
-            crop_uly <= img_bottom    # crop is below image
-        )
-        
-        has_intersection = not no_overlap
-        
-        if not has_intersection:
-            print(f"⚠️  Skipping VRT creation - crop bounds do not intersect with image bounds")
-            print(f"    Archive: {os.path.basename(archive_path)}")
-            print(f"    Crop bounds: [{crop_ulx:.1f}, {crop_uly:.1f}, {crop_lrx:.1f}, {crop_lry:.1f}]")
-            print(f"    Image bounds: [{img_left:.1f}, {img_top:.1f}, {img_right:.1f}, {img_bottom:.1f}]")
-            
-        return has_intersection
 
     def _get_band_files(self, archive_path: str) -> List[str]:
         """Get list of JP2 band files from ZIP archive."""
@@ -623,25 +548,8 @@ class Sentinel2VRTBuilder(VRTBuilder):
             all_files = zip_ref.namelist()
         
         # Get all JP2 files in IMG_DATA, exclude TCI
-        band_files = []
-        for f in all_files:
-            if "IMG_DATA" in f and f.endswith(".jp2") and "TCI" not in f:
-                filename = os.path.basename(f)
-                
-                # Check if auxiliary bands should be included
-                is_auxiliary = any(aux in filename for aux in ['AOT', 'WVP', 'SCL'])
-                
-                if is_auxiliary and not self.include_auxiliary_bands:
-                    # Skip auxiliary bands if not requested
-                    continue
-                elif not is_auxiliary:
-                    # Only include spectral bands (B01-B12, B8A)
-                    if any(band in filename for band in ['_B01', '_B02', '_B03', '_B04', '_B05', '_B06', 
-                                                        '_B07', '_B08', '_B8A', '_B09', '_B10', '_B11', '_B12']):
-                        band_files.append(f)
-                else:
-                    # Include auxiliary bands if requested
-                    band_files.append(f)
+        band_files = [f for f in all_files 
+                     if "IMG_DATA" in f and f.endswith(".jp2") and "TCI" not in f]
         
         # Sort by band number for consistent ordering
         band_files.sort(key=self._extract_band_number)
@@ -663,71 +571,19 @@ class Sentinel2VRTBuilder(VRTBuilder):
         return 999.0  # Fallback
     
     def _filter_by_resolution(self, band_files: List[str], resolution: str) -> List[str]:
-        """Filter band files by resolution, selecting best available resolution for each band."""
-        # Sentinel-2 band native resolution mapping
+        """Filter band files by resolution."""
+        # Sentinel-2 band resolution mapping
         band_resolutions = {
             "B01": "60m", "B02": "10m", "B03": "10m", "B04": "10m",
             "B05": "20m", "B06": "20m", "B07": "20m", "B08": "10m",
             "B8A": "20m", "B09": "60m", "B10": "60m", "B11": "20m", "B12": "20m"
         }
         
-        # Check if this is L1C or L2A by looking at file structure
-        is_l2a = any(f"_{resolution}" in f for f in band_files[:5])  # L2A has explicit resolution in filenames
-        
-        if is_l2a:
-            # L2A: Select best available resolution for each band
-            # Priority: target resolution > native resolution > other resolutions
-            resolution_priority = [resolution, "10m", "20m", "60m"]
-            
-            # Group files by band ID
-            bands_by_id = {}
-            auxiliary_files = []
-            
-            for band_file in band_files:
-                filename = os.path.basename(band_file)
-                band_id = self._extract_band_id(band_file)
-                
-                # Handle auxiliary bands separately
-                if any(aux in filename for aux in ['AOT', 'WVP', 'SCL']):
-                    if self.include_auxiliary_bands and f"_{resolution}" in filename:
-                        auxiliary_files.append(band_file)
-                    continue
-                
-                # Group spectral bands by ID
-                if band_id in band_resolutions:
-                    if band_id not in bands_by_id:
-                        bands_by_id[band_id] = []
-                    bands_by_id[band_id].append(band_file)
-            
-            # Select best resolution for each band
-            filtered_files = []
-            for band_id, candidates in bands_by_id.items():
-                best_candidate = None
-                best_priority = 999
-                
-                for candidate in candidates:
-                    filename = os.path.basename(candidate)
-                    # Check which resolution this file represents
-                    for i, res in enumerate(resolution_priority):
-                        if f"_{res}" in filename:
-                            if i < best_priority:
-                                best_priority = i
-                                best_candidate = candidate
-                            break
-                
-                if best_candidate:
-                    filtered_files.append(best_candidate)
-            
-            # Add auxiliary files if requested
-            filtered_files.extend(auxiliary_files)
-            
-        else:
-            # L1C: Include ALL spectral bands (will be resampled to target resolution)
-            filtered_files = []
-            for band_file in band_files:
-                band_id = self._extract_band_id(band_file)
-                if band_id in band_resolutions:
-                    filtered_files.append(band_file)
+        filtered_files = []
+        for band_file in band_files:
+            band_id = self._extract_band_id(band_file)
+            if band_id in band_resolutions and band_resolutions[band_id] == resolution:
+                filtered_files.append(band_file)
         
         return filtered_files
     
