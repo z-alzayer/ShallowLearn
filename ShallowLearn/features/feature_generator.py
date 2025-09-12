@@ -1,7 +1,7 @@
 from ShallowLearn.IndiceFeatures import GenerateIndicesPerImage
 from ShallowLearn import ImageHelper as ih
-import ShallowLearn.ComputerVisionFeatures as cvf
-from ShallowLearn.band_mapping import band_mapping
+from . import computer_vision_features as cvf
+from ShallowLearn.core.band_mapping import band_mapping
 import numpy as np
 
 

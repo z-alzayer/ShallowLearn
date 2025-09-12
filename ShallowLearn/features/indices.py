@@ -24,16 +24,6 @@ DEFAULT_SENTINEL2_MAPPING = {
 }
 
 
-def remove_zeros_decorator(func):
-    """Decorator to handle zero values in spectral index calculations."""
-    @wraps(func)
-    def wrapper(image, *args, **kwargs):
-        result = func(image, *args, **kwargs)
-        # Only set exact zeros to NaN, not close-to-zero values
-        result = np.where(np.isclose(result, 0, atol=1e-10), np.nan, result)
-        return result
-    return wrapper
-
 
 def get_band_numbers(bands: List[str], band_mapping: Dict) -> List[int]:
     """
@@ -88,7 +78,6 @@ def validate_band_shape(image: np.ndarray, band_numbers: List[int]) -> None:
         raise ValueError(f"Band index {max_band} is out of bounds for image with {image.shape[2]} bands")
 
 
-@remove_zeros_decorator
 def chlorophyll_index(image: np.ndarray, 
                      bands: Optional[List[str]] = None,
                      band_mapping: Optional[Dict] = None) -> np.ndarray:
@@ -137,7 +126,6 @@ def chlorophyll_index(image: np.ndarray,
     return rep
 
 
-@remove_zeros_decorator
 def ocean_color_index(image: np.ndarray, 
                      bands: Optional[List[str]] = None,
                      band_mapping: Optional[Dict] = None) -> np.ndarray:
@@ -184,7 +172,6 @@ def ocean_color_index(image: np.ndarray,
     return fai
 
 
-@remove_zeros_decorator
 def chlorophyll_ocean_color_index(image: np.ndarray, 
                                  bands: Optional[List[str]] = None,
                                  band_mapping: Optional[Dict] = None) -> np.ndarray:
@@ -226,7 +213,6 @@ def chlorophyll_ocean_color_index(image: np.ndarray,
     return ratio
 
 
-@remove_zeros_decorator
 def suspended_sediment_index(image: np.ndarray, 
                            bands: Optional[List[str]] = None,
                            band_mapping: Optional[Dict] = None) -> np.ndarray:
@@ -265,7 +251,6 @@ def suspended_sediment_index(image: np.ndarray,
     return ssi
 
 
-@remove_zeros_decorator
 def turbidity_index(image: np.ndarray, 
                    bands: Optional[List[str]] = None,
                    band_mapping: Optional[Dict] = None) -> np.ndarray:
@@ -303,7 +288,6 @@ def turbidity_index(image: np.ndarray,
     return ti
 
 
-@remove_zeros_decorator
 def water_quality_index(image: np.ndarray, 
                        bands: Optional[List[str]] = None,
                        band_mapping: Optional[Dict] = None) -> np.ndarray:
@@ -343,7 +327,6 @@ def water_quality_index(image: np.ndarray,
     return wqi
 
 
-@remove_zeros_decorator
 def normalized_difference_chlorophyll_index(image: np.ndarray, 
                                           bands: Optional[List[str]] = None,
                                           band_mapping: Optional[Dict] = None) -> np.ndarray:
@@ -383,7 +366,6 @@ def normalized_difference_chlorophyll_index(image: np.ndarray,
     return ndci
 
 
-@remove_zeros_decorator
 def cloud_index(image: np.ndarray, 
                bands: Optional[List[str]] = None,
                band_mapping: Optional[Dict] = None) -> np.ndarray:
@@ -421,7 +403,6 @@ def cloud_index(image: np.ndarray,
     return cloud_idx
 
 
-@remove_zeros_decorator
 def blue_green_ratio(image: np.ndarray, 
                     bands: Optional[List[str]] = None,
                     band_mapping: Optional[Dict] = None) -> np.ndarray:
@@ -459,7 +440,6 @@ def blue_green_ratio(image: np.ndarray,
     return bgr
 
 
-@remove_zeros_decorator
 def water_surface_index(image: np.ndarray, 
                        bands: Optional[List[str]] = None,
                        band_mapping: Optional[Dict] = None) -> np.ndarray:

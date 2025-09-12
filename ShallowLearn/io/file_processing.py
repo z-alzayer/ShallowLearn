@@ -6,7 +6,7 @@ from collections import OrderedDict, defaultdict
 from datetime import datetime
 from typing import List, NamedTuple
 
-from ShallowLearn.band_mapping import band_mapping
+from ShallowLearn.core.band_mapping import band_mapping
 
 
 class MatchingFiles(NamedTuple):

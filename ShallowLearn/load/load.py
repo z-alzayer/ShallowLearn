@@ -151,7 +151,7 @@ def batch_process_landsat_tars(tar_list, gpd_df, out_dir):
 if __name__ == "__main__":
     import geopandas as gpd
 
-    import ShallowLearn.FileProcessing as fp
+    from ..io import file_processing as fp
 
     # Example usage:
     gpd_df = gpd.read_file(

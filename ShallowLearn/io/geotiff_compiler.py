@@ -16,8 +16,8 @@ import rasterio as rio
 from rasterio.enums import Resampling
 from rasterio import open as rio_open
 
-from ShallowLearn.band_mapping import band_mapping
-from ShallowLearn.FileProcessing import (
+from ShallowLearn.core.band_mapping import band_mapping
+from .file_processing import (
     unzip_files, get_file_names_from_zip, delete_files_from_dir, 
     list_files_in_dir, filter_files_by_extension, check_values_in_filenames,
     order_by_band, list_files_in_dir_recur, order_band_names_noreg

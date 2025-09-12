@@ -9,19 +9,14 @@ from typing import List, Optional, Tuple, Union
 import numpy as np
 from skimage.filters import threshold_multiotsu
 from skimage.segmentation import felzenszwalb, quickshift, slic, watershed
+from skimage.transform import resize
 from sklearn.cluster import DBSCAN
 from sklearn.decomposition import PCA
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import MinMaxScaler
 
 # Import StandardDII for depth invariant calculations
-try:
-    from ..StandardDII import apply_depth_invariant_index, calculate_slope_from_values
-except ImportError:
-    from ShallowLearn.StandardDII import (
-        apply_depth_invariant_index,
-        calculate_slope_from_values,
-    )
+from ..features.standard_dii import apply_depth_invariant_index, calculate_slope_from_values
 
 # Suppress sklearn warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -639,3 +634,116 @@ def process_superpixel_dii_pipeline(
         "dii_stack": dii_stack,
         "band_combos": band_combos,
     }
+
+
+def pad_slice_segments(image: np.ndarray, segments: np.ndarray, shape: Tuple[int, int, int] = (32, 32, 3)) -> np.ndarray:
+    """
+    Extract and resize patches from image based on segments.
+    
+    Parameters:
+    -----------
+    image : np.ndarray
+        Input image array
+    segments : np.ndarray
+        Segmentation labels
+    shape : Tuple[int, int, int]
+        Target shape for patches
+        
+    Returns:
+    --------
+    np.ndarray
+        Array of resized patches
+    """
+    patches = []
+    for i in np.unique(segments):
+        segment = segments == i
+        patch = image[segment]
+        resized_patch = resize(patch, shape, preserve_range=True)
+        patches.append(resized_patch)
+    return np.array(patches)
+
+
+def pad_slice_segments_w_0pads(image: np.ndarray, segments: np.ndarray, shape: Tuple[int, int, int] = (32, 32, 13)) -> np.ndarray:
+    """
+    Extract patches from image based on segments with zero padding.
+    
+    Parameters:
+    -----------
+    image : np.ndarray
+        Input image array
+    segments : np.ndarray
+        Segmentation labels
+    shape : Tuple[int, int, int]
+        Target shape for patches
+        
+    Returns:
+    --------
+    np.ndarray
+        Array of padded patches
+    """
+    patches = []
+    for i in np.unique(segments):
+        segment = segments == i
+        patch = image[segment]
+        
+        # Calculate padding needed
+        pad_size = shape[0] - len(patch)
+        if pad_size > 0:
+            # Create zero padding
+            padding = np.zeros((pad_size,) + patch.shape[1:])
+            # Concatenate original patch with padding
+            padded_patch = np.concatenate([patch, padding], axis=0)
+            patches.append(padded_patch)
+        else:
+            # If patch is larger than desired shape, resize it
+            resized_patch = resize(patch, shape, preserve_range=True)
+            patches.append(resized_patch)
+    
+    return np.array(patches)
+
+
+def optics_labels(image: np.ndarray, segments: np.ndarray, min_samples: int = 10) -> np.ndarray:
+    """
+    Apply DBSCAN clustering to PCA-transformed superpixel patches.
+    
+    Parameters:
+    -----------
+    image : np.ndarray
+        Input image array
+    segments : np.ndarray
+        Segmentation labels
+    min_samples : int
+        Minimum samples for DBSCAN
+        
+    Returns:
+    --------
+    np.ndarray
+        Cluster labels
+    """
+    patches = pad_slice_segments(image, segments)
+    pca_image = pca_segments(patches)
+    db = DBSCAN(eps=10, min_samples=min_samples).fit(pca_image)
+    return db.labels_
+
+
+def generate_sup_pixel_labels(image: np.ndarray, no_segments: Optional[int] = None) -> np.ndarray:
+    """
+    Generate superpixel segmentation and labels.
+    
+    Parameters:
+    -----------
+    image : np.ndarray
+        Input image array
+    no_segments : Optional[int]
+        Number of segments (auto-calculated if None)
+        
+    Returns:
+    --------
+    np.ndarray
+        Segmentation labels
+    """
+    if no_segments is None:
+        no_segments = int(np.sqrt(image.shape[0] * image.shape[1]) / 2)
+    
+    segments = slic_segmentation(image, n_segments=no_segments)
+    return segments
