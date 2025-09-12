@@ -21,7 +21,7 @@ from ShallowLearn.segmentation.superpixels import (
     process_superpixel_dii_pipeline,
     slic_segmentation,
 )
-from ShallowLearn.spectral.indices import (
+from ShallowLearn.features.indices import (
     chlorophyll_index,
     normalized_difference_chlorophyll_index,
     ocean_color_index,
@@ -524,7 +524,7 @@ class TestBackwardCompatibility:
 
     def test_spectral_indices_aliases(self):
         """Test that spectral index aliases work for backward compatibility."""
-        from ShallowLearn.spectral.indices import ci, ndci, oci, ssi, wqi
+        from ShallowLearn.features.indices import ci, ndci, oci, ssi, wqi
 
         img = np.random.randint(100, 5000, (20, 20, 13), dtype=np.uint16)
 

@@ -4,20 +4,53 @@ Installing **ShallowLearn** is straightforward. Follow these steps to get starte
 
 ## Prerequisites
 
-Make sure you have Python 3.10.14 installed on your system. We recommend setting up a conda environment before installation. A yml enviornment file is provided. 
+Make sure you have Python 3.10+ installed on your system. **ShallowLearn now exclusively supports [uv](https://docs.astral.sh/uv/) as the package manager**.
 
 ## Installing the Package
 
-Clone the repository and install the package using pip:
+### Using uv (Recommended)
 
 ```bash
+# Install uv if you haven't already
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Clone the repository
 git clone https://github.com/z-alzayer/ShallowLearn.git
 cd ShallowLearn
-conda env create -f environment.yml # (1)!
-pip install -e .
+
+# Install dependencies and the package
+uv pip install -e .
 ```
 
-1. If the environment fails due to dependancies in the future, recreating it is fairly straightforward for the methods, the primary dependancies are sklearn, pandas and  numpy.
+### Environment Configuration
 
-!!! warning 
-This has been tested primarily on linux environments, whilst it should work on windows there are no guarantees
+Create a `.env` file in the project root for API credentials:
+
+```bash
+# Copy example environment file
+cp .env.example .env
+# Edit with your credentials
+```
+
+Required environment variables:
+- `LSAT_TOKEN` - USGS EarthExplorer M2M API token for Landsat data
+- `LSAT_USER` - USGS EarthExplorer username
+- `SEN_USER` - Copernicus Data Space username for Sentinel-2
+- `SEN_PASS` - Copernicus Data Space password
+
+## Development Installation
+
+For development with additional dependencies:
+
+```bash
+uv pip install -e ".[dev]"
+# This includes testing, documentation, and code quality tools
+```
+
+## System Requirements
+
+!!! warning "Platform Support" 
+This package has been tested primarily on Linux environments. While it should work on macOS and Windows, there are no guarantees.
+
+!!! note "GDAL Dependencies"
+    The package requires GDAL which can be complex to install. Using the provided environment ensures all geospatial dependencies are correctly configured.

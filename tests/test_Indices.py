@@ -1,6 +1,6 @@
 import numpy as np
-from ShallowLearn.band_mapping import band_mapping
-import ShallowLearn.Indices as band_indices
+from ShallowLearn.core.band_mapping import band_mapping
+import ShallowLearn.features.indices as band_indices
 import pytest
 
 # Fixture for a sample multi-band image (e.g., 3x3 with 13 channels)
@@ -20,7 +20,7 @@ def sample_indices_image():
 def test_get_band_numbers():
     bands = ['B04', 'B03', 'B02']
     expected = [band_mapping[b]['index'] for b in bands]
-    assert band_indices.get_band_numbers(bands) == expected
+    assert band_indices.get_band_numbers(bands, band_mapping) == expected
 
 def test_validate_band_shape_valid(sample_indices_image):
     # Test should pass

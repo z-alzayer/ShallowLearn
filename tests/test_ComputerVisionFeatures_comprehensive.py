@@ -7,7 +7,7 @@ import pytest
 import numpy as np
 import warnings
 
-from ShallowLearn.ComputerVisionFeatures import (
+from ShallowLearn.features.computer_vision_features import (
     edge_density, texture_features, color_histogram, sobel_edge_detection, 
     gabor_features, histogram_of_oriented_gradients
 )

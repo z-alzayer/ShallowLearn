@@ -19,7 +19,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from ShallowLearn.band_mapping import band_mapping
+from ShallowLearn.core.band_mapping import band_mapping
 from ShallowLearn.core.array_utils import (
     clip_array,
     normalize_array,

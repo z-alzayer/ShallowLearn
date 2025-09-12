@@ -1,10 +1,10 @@
 import pytest
 import numpy as np
 from unittest.mock import Mock, patch
-from ShallowLearn.band_mapping import band_mapping
+from ShallowLearn.core.band_mapping import band_mapping
 # ImageHelper module removed - functions moved to new modular structure
 # from ShallowLearn import ImageHelper, Indices
-from ShallowLearn import Indices
+from ShallowLearn.features import indices as Indices
 from ShallowLearn.visualization.display import create_rgb_image
 from ShallowLearn.core.array_utils import get_band_numbers
 
@@ -49,10 +49,11 @@ class TestBandMappingDependencies:
         assert all(isinstance(idx, int) for idx in band_indices)
 
     def test_indices_band_mapping_dependency(self):
-        """Test that Indices module has the expected band_mapping dependency"""
-        # This test verifies the import exists and is accessible
-        assert hasattr(Indices, 'band_mapping')
-        assert Indices.band_mapping is not None
+        """Test that Indices module functions work with band_mapping"""
+        # Test that indices functions can access band mapping when needed
+        from ShallowLearn.core.band_mapping import band_mapping as core_band_mapping
+        assert core_band_mapping is not None
+        assert isinstance(core_band_mapping, dict)
 
     def test_indices_get_band_numbers_function_exists(self):
         """Test that get_band_numbers function exists in Indices module"""
@@ -251,28 +252,19 @@ class TestFunctionParameterization:
 
     def test_get_band_numbers_function(self):
         """Test the get_band_numbers function behavior"""
-        # This function likely converts band names to indices using band_mapping
-        try:
-            # Test with valid Sentinel-2 bands
-            band_numbers = Indices.get_band_numbers(['B02', 'B03', 'B04'])
-            assert isinstance(band_numbers, (list, np.ndarray))
-            assert len(band_numbers) == 3
-        except Exception as e:
-            # Function might not be directly accessible or have different interface
-            pytest.skip(f"get_band_numbers not accessible: {e}")
+        # This function converts band names to indices using band_mapping
+        # Test with valid Sentinel-2 bands - now requires band_mapping parameter
+        band_numbers = Indices.get_band_numbers(['B02', 'B03', 'B04'], band_mapping)
+        assert isinstance(band_numbers, (list, np.ndarray))
+        assert len(band_numbers) == 3
 
     def test_validate_band_shape_function(self):
         """Test the validate_band_shape function behavior"""
-        try:
-            test_image = np.random.randint(0, 1000, (50, 50, 13), dtype=np.uint16)
-            band_numbers = [0, 1, 2, 3]
-            
-            # This should not raise an exception if image has enough bands
-            Indices.validate_band_shape(test_image, band_numbers)
-            
-        except Exception as e:
-            # Function might not be directly accessible or have different interface
-            pytest.skip(f"validate_band_shape not accessible: {e}")
+        test_image = np.random.randint(0, 1000, (50, 50, 13), dtype=np.uint16)
+        band_numbers = [0, 1, 2, 3]
+        
+        # This should not raise an exception if image has enough bands
+        Indices.validate_band_shape(test_image, band_numbers)
 
 
 class TestRefactoringRecommendations:
@@ -281,9 +273,9 @@ class TestRefactoringRecommendations:
     def test_document_hardcoded_imports(self):
         """Document all hardcoded band_mapping imports that need refactoring"""
         hardcoded_files = [
-            'ImageHelper.py:8',  # from ShallowLearn.band_mapping import band_mapping
-            'Indices.py:2',      # from ShallowLearn.band_mapping import band_mapping  
-            'LoadData.py:20',    # from ShallowLearn.band_mapping import band_mapping
+            'ImageHelper.py:8',  # from ShallowLearn.core.band_mapping import band_mapping
+            'Indices.py:2',      # from ShallowLearn.core.band_mapping import band_mapping  
+            'LoadData.py:20',    # from ShallowLearn.core.band_mapping import band_mapping
         ]
         
         # These files need to be refactored to accept band_mapping as parameter

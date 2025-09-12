@@ -1,32 +1,77 @@
 
-# Table of Contents
+# Quick Start Guide
 
-This document provides an overview of the key modules and their functionalities in the ShallowLearn library.
+Get started with ShallowLearn's core functionality for satellite data analysis.
 
----
+## Installation
 
-## 1. [ImageHelper](reading_writing.md)
+```bash
+# Install uv if you haven't already
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-**Description:**  
-This module contains a variety of tools for working with geospatial and image data. It includes functions for:
-- Loading and preprocessing GeoTIFF images
-- Visualizing data in various color spaces (RGB, HSV, LAB, YCbCr)
-- Generating and applying masks
-- Plotting histograms and labeled data
-- Advanced plotting options with legends and coordinates
+# Clone and install ShallowLearn
+git clone https://github.com/z-alzayer/ShallowLearn.git
+cd ShallowLearn
+uv pip install -e .
+```
 
-Refer to the [ImageHelper Quick Start Guide](reading_writing.md) for detailed usage examples.
+## Basic Usage
 
----
+### Spectral Indices
 
-## 2. [ComputerVisionFeatures](cv_features.md)
+```python
+from ShallowLearn.features.indices import bgr, ndci
+import numpy as np
 
-**Description:**  
-This module provides essential computer vision functions for feature extraction and image processing. Key functionalities include:
-- Edge detection (Canny, Sobel)
-- Texture analysis using Local Binary Patterns (LBP)
-- Feature extraction with Histogram of Oriented Gradients (HOG)
-- Gabor filtering for texture features
-- Color histogram computation
+# Create sample 4-band image
+image = np.random.rand(100, 100, 4) * 0.3
 
-Refer to the [ComputerVisionFeatures Quick Start Guide](cv_features.md) for detailed usage examples.
+# Calculate Blue-Green Ratio for water quality
+bgr_result = bgr(image, bands=['B02', 'B03'])
+print(f"BGR shape: {bgr_result.shape}")
+
+# Calculate chlorophyll index
+ndci_result = ndci(image, bands=['B04', 'B03'])
+print(f"NDCI shape: {ndci_result.shape}")
+```
+
+### Time Series Visualization
+
+```python
+from ShallowLearn.visualization.time_series_plots import plot_spectral_timeseries
+import pandas as pd
+import numpy as np
+
+# Sample spectral time series
+spectra = np.random.rand(10, 4) * 0.5
+dates = pd.date_range('2023-01-01', periods=10, freq='30D')
+band_labels = {0: 'Blue', 1: 'Green', 2: 'Red', 3: 'NIR'}
+
+# Plot time series
+fig = plot_spectral_timeseries(
+    spectra=spectra,
+    dates=dates, 
+    band_labels=band_labels,
+    title="Spectral Evolution"
+)
+```
+
+### QuickLook Analysis
+
+```python
+from ShallowLearn.ml.quicklook_processor import QuickLookProcessor
+
+# Initialize processor
+processor = QuickLookProcessor()
+
+# Process satellite images (with your actual image paths)
+# results = processor.run_complete_analysis(image_paths)
+```
+
+## Next Steps
+
+- **[IO Module](io_module.md)** - Detailed satellite data loading
+- **[ML Module](ml_module.md)** - Machine learning workflows  
+- **[Features Module](features_module.md)** - Spectral index calculations
+- **[Visualization Module](visualization_module.md)** - Plotting functions
+- **[API Reference](api_reference.md)** - Complete function documentation

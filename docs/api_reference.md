@@ -1,26 +1,43 @@
 # API Reference
 
-::: ShallowLearn.ImageHelper
+## Core Modules
+
+### IO Module
+::: ShallowLearn.io
     options:
       show_source: true
-::: ShallowLearn.CloudDetector
+
+### ML Module  
+::: ShallowLearn.ml
     options:
       show_source: true
-::: ShallowLearn.ComputerVisionFeatures
+
+### Core Module
+::: ShallowLearn.core
     options:
       show_source: true
-::: ShallowLearn.PointExtraction
+
+### API Module
+::: ShallowLearn.api
     options:
       show_source: true
-::: ShallowLearn.Transform
+
+### Features Module
+::: ShallowLearn.features
     options:
       show_source: true
-::: ShallowLearn.RadiometricNormalisation
+
+### Segmentation Module
+::: ShallowLearn.segmentation
     options:
       show_source: true
-::: ShallowLearn.QuickLook
+
+### Visualization Module
+::: ShallowLearn.visualization
     options:
       show_source: true
-::: ShallowLearn.Util
+
+### Utilities Module
+::: ShallowLearn.utilities
     options:
       show_source: true

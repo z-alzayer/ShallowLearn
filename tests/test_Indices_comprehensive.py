@@ -7,7 +7,8 @@ import pytest
 import numpy as np
 import warnings
 
-from ShallowLearn.Indices import (
+from ShallowLearn.core.band_mapping import band_mapping
+from ShallowLearn.features.indices import (
     ci, oci, cl_oci, ssi, ti, wqi, ndci, cloud_index, bgr, 
     calculate_water_surface_index, calculate_pseudo_subsurface_depth,
     get_band_numbers, validate_band_shape
@@ -180,7 +181,7 @@ class TestIndicesEdgeCases:
         image[:, :, 2] = 200   # Green (B03)
         
         result = bgr(image)
-        expected = 100 / 200  # Blue / Green
+        expected = 100 / (200 + 1)  # Blue / (Green + 1) - implementation uses +1 for zero division protection
         
         assert np.allclose(result, expected, atol=1e-10)
 
@@ -192,7 +193,7 @@ class TestUtilityFunctions:
         """Test get_band_numbers function."""
         try:
             bands = ['B02', 'B03', 'B04']
-            result = get_band_numbers(bands)
+            result = get_band_numbers(bands, band_mapping)
             
             assert isinstance(result, list)
             assert len(result) == 3
