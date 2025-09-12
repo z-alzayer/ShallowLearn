@@ -42,6 +42,10 @@ Apply consistent matplotlib formatting:
 ```python
 from ShallowLearn.utilities.util import standardize_axes  
 import matplotlib.pyplot as plt
+import numpy as np
+
+# Create sample image for demonstration
+image = np.random.rand(50, 50, 3)
 
 fig, ax = plt.subplots()
 ax.imshow(image)
@@ -51,29 +55,24 @@ standardize_axes(ax)  # Apply consistent formatting
 
 ## File Discovery
 
-Find satellite imagery files:
+Find Landsat satellite files:
 
 ```python
-from ShallowLearn.utilities.file_discovery import find_satellite_files
+from ShallowLearn.utilities.file_discovery import find_landsat_files
 
-# Find Sentinel-2 files
-s2_files = find_satellite_files(
-    directory="/data/satellite/",
-    sensor_type="sentinel2", 
-    recursive=True
-)
-print(f"Found {len(s2_files)} Sentinel-2 scenes")
+# Find Landsat files in directory
+landsat_files = find_landsat_files("/path/to/data/")
+print(f"Found {len(landsat_files)} Landsat files")
 ```
 
 ## Date Helper
 
-Handle satellite imagery dates:
+Extract dates from satellite data:
 
 ```python
-from ShallowLearn.utilities.date_helper import parse_satellite_date
+from ShallowLearn.utilities.date_helper import extract_dates
 
-# Parse Sentinel-2 filename
-filename = "S2A_MSIL2A_20230315T103021_N0509_R108_T32TNR_20230315T143534.SAFE"
-date = parse_satellite_date(filename)
-print(f"Acquisition date: {date}")
+# Extract dates from file paths or names
+dates = extract_dates(["file_20230101.tif", "file_20230201.tif"])
+print(f"Extracted dates: {dates}")
 ```

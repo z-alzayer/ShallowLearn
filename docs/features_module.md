@@ -1,6 +1,6 @@
 # Features Module
 
-The Features module provides feature extraction capabilities for remote sensing data, including spectral indices and computer vision features.
+The Features module provides spectral indices for remote sensing water quality analysis.
 
 ## Spectral Indices
 
@@ -10,7 +10,7 @@ Calculate water quality and marine remote sensing indices:
 from ShallowLearn.features.indices import bgr, ndci, turbidity_index
 import numpy as np
 
-# Create sample 4-band image (Blue, Green, Red, NIR)
+# Create sample 4-band image
 image = np.random.rand(50, 50, 4) * 0.3
 
 # Calculate Blue-Green Ratio
@@ -26,38 +26,30 @@ ti_result = turbidity_index(image, bands=['B04', 'B03', 'B02'])  # Red, Green, B
 print(f"TI shape: {ti_result.shape}")  # (50, 50)
 ```
 
-### Available Indices
+## Available Indices
 
 - `bgr()` - Blue-Green Ratio for water quality
 - `ndci()` - Normalized Difference Chlorophyll Index  
 - `turbidity_index()` - Turbidity estimation
 - `water_quality_index()` - General water quality
 - `suspended_sediment_index()` - Sediment concentration
+- `chlorophyll_index()` - Chlorophyll concentration
+- `ocean_color_index()` - Ocean color analysis
 
-## Computer Vision Features
+## Integration with Other Modules
 
-Extract texture features from imagery:
-
-```python
-from ShallowLearn.features.computer_vision_features import compute_lbp_features
-import numpy as np
-
-# Single band image for texture analysis
-band_image = np.random.rand(100, 100) * 255
-lbp_features = compute_lbp_features(band_image.astype(np.uint8))
-```
-
-## Depth Invariant Indices
-
-Specialized indices for shallow water remote sensing:
+Use with satellite imagery from the IO module:
 
 ```python
-from ShallowLearn.features.standard_dii import calculate_dii
+from ShallowLearn.io.satellite_data import Sentinel2Image
+from ShallowLearn.features.indices import bgr, ndci
 
-# Calculate depth invariant index
-dii_values = calculate_dii(
-    blue_band=image[:,:,0], 
-    green_band=image[:,:,1],
-    red_band=image[:,:,2]
-)
+# Load Sentinel-2 image
+s2_img = Sentinel2Image("path/to/sentinel2.zip")
+
+# Calculate water quality indices
+bgr_result = bgr(s2_img.image, bands=['B02', 'B03'])
+ndci_result = ndci(s2_img.image, bands=['B04', 'B03'])
+
+print(f"Water quality analysis complete: BGR {bgr_result.shape}, NDCI {ndci_result.shape}")
 ```
