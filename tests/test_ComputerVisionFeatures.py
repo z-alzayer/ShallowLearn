@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from ShallowLearn import ComputerVisionFeatures as cvf
+from ShallowLearn.features import computer_vision_features as cvf
 
 class TestFeatureExtractors:
     @classmethod
