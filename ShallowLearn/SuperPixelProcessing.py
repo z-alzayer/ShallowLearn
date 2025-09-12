@@ -1,28 +1,29 @@
-import ShallowLearn.SuperPixelExtraction as spe
-import ShallowLearn.ImageHelper as ih
-import ShallowLearn.FileProcessing as fp
-import ShallowLearn.CloudDetector as cloud_detector
-import pandas as pd
-import matplotlib.pyplot as plt 
-import numpy as np
-from sklearn.preprocessing import MinMaxScaler
-from skimage.color import rgb2lab
-import ShallowLearn.Transform as trf
-import joblib
 import os
-from sklearn.mixture import BayesianGaussianMixture
+import re
 import time
+
+import joblib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from scipy import stats
 from skimage import exposure
-import re
+from skimage.color import rgb2lab
+
+import ShallowLearn.CloudDetector as cloud_detector
+import ShallowLearn.FileProcessing as fp
+import ShallowLearn.SuperPixelExtraction as spe
+from ShallowLearn.core.array_utils import apply_mask
+from ShallowLearn.visualization import display
+
 
 def extract_date_from_filename(filename):
-    """ Extract the date from the filename string """
-    match = re.search(r'\d{8}', filename)
-    return match.group(0) if match else 'Unknown Date'
+    """Extract the date from the filename string"""
+    match = re.search(r"\d{8}", filename)
+    return match.group(0) if match else "Unknown Date"
 
 
-def calculate_image_statistics(image, statistic_type='mean'):
+def calculate_image_statistics(image, statistic_type="mean"):
     """
     Calculates and returns the mean, mode, or median of an image per channel.
 
@@ -36,17 +37,20 @@ def calculate_image_statistics(image, statistic_type='mean'):
     statistics = np.zeros(image.shape[2])
 
     for channel in range(image.shape[2]):
-        if statistic_type == 'mean':
+        if statistic_type == "mean":
             statistics[channel] = image[:, :, channel].mean()
-        elif statistic_type == 'median':
+        elif statistic_type == "median":
             statistics[channel] = np.median(image[:, :, channel])
-        elif statistic_type == 'mode':
+        elif statistic_type == "mode":
             mode_result = stats.mode(image[:, :, channel], axis=None)
             statistics[channel] = mode_result.mode[0]
         else:
-            raise ValueError("Invalid statistic type specified. Choose 'mean', 'mode', or 'median'.")
+            raise ValueError(
+                "Invalid statistic type specified. Choose 'mean', 'mode', or 'median'."
+            )
 
     return statistics
+
 
 def calculate_nonzero_percentile(data, percentile):
     """
@@ -61,19 +65,18 @@ def calculate_nonzero_percentile(data, percentile):
     """
     # Remove zeros
     non_zero_data = data[data != 0]
-    
+
     # Check if there are any non-zero elements left
     if non_zero_data.size == 0:
         return 0
-    
+
     # Calculate percentile
     percentile_value = np.percentile(non_zero_data, percentile)
-    
+
     return percentile_value
 
 
-
-def gen_dii(image, sup, deep_label=4, get_deep = False):
+def gen_dii(image, sup, deep_label=4, get_deep=False):
     # Print unique superpixel labels to verify input
     # print(np.unique(sup))
     # Determine the masks for deep and shallow regions based on the deep_label
@@ -86,10 +89,12 @@ def gen_dii(image, sup, deep_label=4, get_deep = False):
     # Process each band
     deep_areas = []
     shallow_areas = []
-    for band in range(image.shape[2]):  # Assuming image has shape [height, width, bands]
+    for band in range(
+        image.shape[2]
+    ):  # Assuming image has shape [height, width, bands]
         # Extract band data
         band_data = image[:, :, band]
-        
+
         # Calculate average reflectance in deep and shallow areas for the current band
         try:
             print(band_data[mask_deep].shape)
@@ -98,7 +103,7 @@ def gen_dii(image, sup, deep_label=4, get_deep = False):
         except Exception as e:
             print(f"Unable to get a percentile due to: {str(e)}")
             return None
-        
+
         R_shallow_avg = np.mean(band_data[mask_shallow])
         shallow_areas.append(R_shallow_avg)
         # Compute DII for each pixel in the current band
@@ -111,11 +116,14 @@ def gen_dii(image, sup, deep_label=4, get_deep = False):
         return deep_areas, shallow_areas
 
     return dii_results
+
+
 # Function to load models
 def load_models():
-    pca = joblib.load('../../Models/SuperPixelTS.pkl')
+    pca = joblib.load("../../Models/SuperPixelTS.pkl")
     bgm = joblib.load("../../Models/BayesianGMSuperPixel.pkl")
     return pca, bgm
+
 
 # Function to process cloud in the image
 def process_cloud(image_path):
@@ -127,9 +135,9 @@ def process_cloud(image_path):
 # Function to plot results
 def plot_results(dii_results, img_rescale, img, image_path):
     fig, ax = plt.subplots(1, 3, figsize=(10, 10))
-    ax[0].imshow(ih.plot_rgb(dii_results))
-    ax[1].imshow(ih.plot_rgb(img_rescale))
-    ax[2].imshow(ih.plot_rgb(img))
+    ax[0].imshow(display.plot_rgb(dii_results))
+    ax[1].imshow(display.plot_rgb(img_rescale))
+    ax[2].imshow(display.plot_rgb(img))
     ax[0].set_title("DII Results")
     ax[1].set_title("Exposure Adjusted")
     ax[2].set_title("Cloud Removed Image")
@@ -137,32 +145,44 @@ def plot_results(dii_results, img_rescale, img, image_path):
     print(f"Finished processing: {fname_substring}")
     plt.show()
 
-def create_and_pad_superpixels_v2(img, bands = [3,2,1], n_segments = None, shape = (32, 32, 13), 
-                                  resize_method = None, correction_factor = 10_000):
-    lab_image = rgb2lab(img[:,:,bands] / correction_factor)
+
+def create_and_pad_superpixels_v2(
+    img,
+    bands=[3, 2, 1],
+    n_segments=None,
+    shape=(32, 32, 13),
+    resize_method=None,
+    correction_factor=10_000,
+):
+    lab_image = rgb2lab(img[:, :, bands] / correction_factor)
     if n_segments is None:
-        n_segments = int(img.shape[0]/2)
-    super_px = spe.slic_segmentation(lab_image, n_segments = n_segments, faster_slic=False)
+        n_segments = int(img.shape[0] / 2)
+    super_px = spe.slic_segmentation(
+        lab_image, n_segments=n_segments, faster_slic=False
+    )
     if resize_method is None:
-        padded_segments = spe.pad_slice_segments_w_0pads(img, super_px, shape = shape)
+        padded_segments = spe.pad_slice_segments_w_0pads(img, super_px, shape=shape)
     else:
         padded_segments, super_px = create_and_pad_super_pixels(img)
     return padded_segments, super_px
 
-def create_and_pad_super_pixels(img, pad_shape = (32,32,13)):
+
+def create_and_pad_super_pixels(img, pad_shape=(32, 32, 13)):
     start_time = time.time()
-    lab_image = ih.plot_lab(img).astype(np.uint8)
+    lab_image = display.plot_lab(img).astype(np.uint8)
     super_pixel = spe.slic_segmentation(lab_image, n_segments=int(img.shape[0] / 2))
-    padded_segment = spe.pad_slice_segments(img, super_pixel, shape = pad_shape)
+    padded_segment = spe.pad_slice_segments(img, super_pixel, shape=pad_shape)
     end_time = time.time()
     print(f"Processing time: {end_time - start_time} seconds")
     return padded_segment, super_pixel
+
 
 def apply_pca_bgm(padded_segment, pca, bgm):
     padded_array = np.array(padded_segment)
     transformed_pca = pca.transform(padded_array.reshape(padded_array.shape[0], -1))
     labels = bgm.predict(transformed_pca)
     return labels
+
 
 def relabel_super_pixels(super_pixel, labels):
     # Create an output array for relabeled super pixels
@@ -176,19 +196,20 @@ def relabel_super_pixels(super_pixel, labels):
 
     return relabeled_super_pixels
 
-def process_single_image_from_array(img, get_deep = False):
-    pca,bgm = load_models()
+
+def process_single_image_from_array(img, get_deep=False):
+    pca, bgm = load_models()
 
     padded_segment, super_pixel = create_and_pad_superpixels_v2(img)
-        
+
     labels = apply_pca_bgm(padded_segment, pca, bgm)
     relabeled_super_pixels = relabel_super_pixels(super_pixel, labels)
-        # Additional processing...
+    # Additional processing...
     try:
         dii = gen_dii(img, relabeled_super_pixels, deep_label=4, get_deep=get_deep)
         if get_deep == True:
             return dii, relabeled_super_pixels
-        dii_results = ih.apply_mask(dii, spe.ostu_filter(dii))
+        dii_results = apply_mask(dii, spe.ostu_filter(dii))
 
         return dii_results
     except Exception as e:
@@ -196,24 +217,25 @@ def process_single_image_from_array(img, get_deep = False):
 
     print("Single image processing complete")
 
-def process_single_image(image_path, plot=False, get_deep = False):
+
+def process_single_image(image_path, plot=False, get_deep=False):
     print(os.path.curdir)
     pca, bgm = load_models()
-    
+
     if image_path.endswith(".tiff"):
         img = process_cloud(image_path)
 
         padded_segment, super_pixel = create_and_pad_super_pixels(img)
-        
+
         labels = apply_pca_bgm(padded_segment, pca, bgm)
         relabeled_super_pixels = relabel_super_pixels(super_pixel, labels)
-        
+
         # Additional processing...
         try:
             dii = gen_dii(img, relabeled_super_pixels, deep_label=4, get_deep=get_deep)
             if get_deep == True:
                 return dii, relabeled_super_pixels
-            dii_results = ih.apply_mask(dii, spe.ostu_filter(dii))
+            dii_results = apply_mask(dii, spe.ostu_filter(dii))
             img_rescale = exposure.equalize_hist(dii_results)
             if plot:
                 plot_results(dii_results, img_rescale, img, image_path)
@@ -226,7 +248,7 @@ def process_single_image(image_path, plot=False, get_deep = False):
 
 if __name__ == "__main__":
     print(os.path.curdir)
-    pca = joblib.load('Models/SuperPixelTS.pkl')
+    pca = joblib.load("Models/SuperPixelTS.pkl")
     bgm = joblib.load("Models/BayesianGMSuperPixel.pkl")
 
     path = "/mnt/sda_mount/Clipped/L1C/"
@@ -252,7 +274,9 @@ if __name__ == "__main__":
         # break
         # break
     img_arr = np.array(cloud_less)
-    np.save("/home/zba21/Documents/ShallowLearn/Data/24_Reef/cloudless_arr.npy", img_arr)
+    np.save(
+        "/home/zba21/Documents/ShallowLearn/Data/24_Reef/cloudless_arr.npy", img_arr
+    )
     super_pixels = []
     padded_segments = []
 
@@ -260,8 +284,10 @@ if __name__ == "__main__":
     print("Creating super pixels")
     for image in img_arr:
         # Assuming ih.plot_lab(image) processes and returns image data
-        lab_image = ih.plot_lab(image).astype(np.uint8)
-        super_pixels.append(spe.slic_segmentation(lab_image, n_segments = int(img.shape[0] / 2)))
+        lab_image = display.plot_lab(image).astype(np.uint8)
+        super_pixels.append(
+            spe.slic_segmentation(lab_image, n_segments=int(img.shape[0] / 2))
+        )
         padded_segments.extend(spe.pad_slice_segments(image, super_pixels[-1]))
 
     end_time = time.time()  # End timing after the loop
@@ -283,7 +309,6 @@ if __name__ == "__main__":
     # print(f"Processing time: {elapsed_time} seconds")
 
     # for sup, image in zip(super_pixels, img_arr):
-        
 
     padded_array = np.array(padded_segments)
 
@@ -291,30 +316,40 @@ if __name__ == "__main__":
     # bgm = BayesianGaussianMixture(n_components=5).fit(transformed_pca)
     labels = bgm.predict(transformed_pca)
     # joblib.dump(bgm, "Models/BayesianGMSuperPixel.pkl")
-    np.save("/home/zba21/Documents/ShallowLearn/Data/24_Reef/SuperPixelArr.npy", np.array(super_pixels))
+    np.save(
+        "/home/zba21/Documents/ShallowLearn/Data/24_Reef/SuperPixelArr.npy",
+        np.array(super_pixels),
+    )
     dii_arr = []
     final_paths = []
     for i in range(70):
         try:
-            dii = gen_dii(img_arr[i], super_pixels[i], deep_label = 5)
-            dii_results = ih.apply_mask(dii, spe.ostu_filter(dii))
+            dii = gen_dii(img_arr[i], super_pixels[i], deep_label=5)
+            dii_results = apply_mask(dii, spe.ostu_filter(dii))
             dii_arr.append(dii_results)
             # if i < 7:
             #     continue
             # dii_results = trf.LCE_multi(dii_results)
-            fig, ax = plt.subplots(1,3, figsize = (10, 10))
+            fig, ax = plt.subplots(1, 3, figsize=(10, 10))
             # p2, p98 = np.percentile(dii_results, (2, 98))
             img_rescale = exposure.equalize_hist(dii_results)
-            ax[0].imshow(ih.plot_rgb(dii_results))
-            ax[1].imshow(ih.plot_rgb(img_rescale))
-            ax[2].imshow(ih.plot_rgb(img_arr[i]))
+            ax[0].imshow(display.plot_rgb(dii_results))
+            ax[1].imshow(display.plot_rgb(img_rescale))
+            ax[2].imshow(display.plot_rgb(img_arr[i]))
             fname_substring = extract_date_from_filename(images[i])
             print(f"Finished processing: {fname_substring}")
-            plt.savefig(f"/home/zba21/Documents/ShallowLearn/Data/24_Reef/figure_{fname_substring}.pdf")
+            plt.savefig(
+                f"/home/zba21/Documents/ShallowLearn/Data/24_Reef/figure_{fname_substring}.pdf"
+            )
             final_paths.append(images[i])
         except:
             print("Arr failed: argh")
             continue
-    pd.DataFrame(final_paths).to_csv("/home/zba21/Documents/ShallowLearn/Data/24_Reef/filenames.csv")
-    np.save("/home/zba21/Documents/ShallowLearn/Data/24_Reef/dii_arr.npy", np.array(dii_arr))
+    pd.DataFrame(final_paths).to_csv(
+        "/home/zba21/Documents/ShallowLearn/Data/24_Reef/filenames.csv"
+    )
+    np.save(
+        "/home/zba21/Documents/ShallowLearn/Data/24_Reef/dii_arr.npy", np.array(dii_arr)
+    )
     print("Everything worked")
+

@@ -194,6 +194,31 @@ class LandsatImage(SatelliteImage):
 class Sentinel2Image(SatelliteImage):
     """Sentinel-2 image with band ordering and missing band handling."""
 
+    def __init__(self, file_path: str, load_all_bands: bool = False, target_resolution: str = "10m", 
+                 clip_geometry=None, buffer_meters: float = 0):
+        """
+        Initialize Sentinel-2 image.
+        
+        Parameters:
+        -----------
+        file_path : str
+            Path to Sentinel-2 file (.SAFE directory, .zip file, or MTD XML file)
+        load_all_bands : bool
+            If True, loads all 13 bands by resampling from different resolution subdatasets.
+            If False, loads only the native resolution bands (default: 4 bands at 10m)
+        target_resolution : str
+            Target resolution when load_all_bands=True ("10m", "20m", "60m")
+        clip_geometry : shapely geometry or GeoDataFrame, optional
+            Geometry to clip to during loading for efficiency
+        buffer_meters : float
+            Buffer distance in meters to add around clip_geometry
+        """
+        self.load_all_bands = load_all_bands
+        self.target_resolution = target_resolution
+        self.clip_geometry = clip_geometry
+        self.buffer_meters = buffer_meters
+        super().__init__(file_path)
+
     @property
     def band_order(self) -> Dict[str, int]:
         """Canonical Sentinel-2 band order with index mapping."""
@@ -291,36 +316,63 @@ class Sentinel2Image(SatelliteImage):
             self.tags = ds.tags()
             self.meta = ds.meta.copy()
             
-        # Use 10m resolution bands as default (like original implementation)
-        resolution_10m = [s for s in subdatasets if "10m" in s]
-        
-        if resolution_10m:
-            # Load the 10m resolution data
-            with rio.open(resolution_10m[0]) as src:
-                # Read all bands at once - this maintains original resolution
-                data = src.read()  # Shape: (bands, height, width)
-                
-                # Map bands based on descriptions
-                band_data = {}
-                for i in range(src.count):
-                    band_desc = (
-                        src.descriptions[i].split(",")[0] if src.descriptions[i] else f"Band_{i + 1}"
-                    )
-                    # Handle the naming convention (B2 vs B02)
-                    if band_desc.startswith('B') and len(band_desc) == 2:
-                        band_desc = f"B0{band_desc[1]}"
-                    
-                    if band_desc in self.band_order:
-                        band_data[band_desc] = data[i]
-                        self.present_bands.add(band_desc)
-
-                # Create ordered array with placeholders for missing bands
-                self._create_ordered_array(band_data)
+        # Load bands based on configuration
+        if self.load_all_bands:
+            # Load all bands from multiple resolution subdatasets
+            self._load_all_resolution_bands(subdatasets, self.target_resolution)
         else:
-            # Fallback: use the first available subdataset
-            with rio.open(subdatasets[0]) as src:
-                data = src.read()
-                self.image = np.transpose(data, (1, 2, 0))  # (height, width, bands)
+            # Use 10m resolution bands as default (original behavior)
+            resolution_10m = [s for s in subdatasets if "10m" in s]
+            
+            if resolution_10m:
+                # Calculate clipping window if geometry provided
+                clip_window = None
+                if self.clip_geometry is not None:
+                    clip_window = self._calculate_clip_window(resolution_10m[0])
+                    if clip_window is None:
+                        print("Warning: Invalid clip window, loading full 10m image")
+                
+                # Load the 10m resolution data
+                with rio.open(resolution_10m[0]) as src:
+                    try:
+                        # Read all bands (with clipping if specified)
+                        if clip_window:
+                            data = src.read(window=clip_window)  # Shape: (bands, height, width)
+                            # Update metadata for clipped region
+                            from rasterio.windows import transform as window_transform
+                            self.meta['transform'] = window_transform(clip_window, src.meta['transform'])
+                            self.meta['width'] = int(clip_window.width)
+                            self.meta['height'] = int(clip_window.height)
+                        else:
+                            data = src.read()  # Shape: (bands, height, width)
+                    except Exception as e:
+                        print(f"Error reading 10m data: {e}")
+                        if clip_window:
+                            print(f"Window: {clip_window.width} x {clip_window.height}")
+                        # Fallback to full image
+                        data = src.read()
+                    
+                    # Map bands based on descriptions
+                    band_data = {}
+                    for i in range(src.count):
+                        band_desc = (
+                            src.descriptions[i].split(",")[0] if src.descriptions[i] else f"Band_{i + 1}"
+                        )
+                        # Handle the naming convention (B2 vs B02)
+                        if band_desc.startswith('B') and len(band_desc) == 2:
+                            band_desc = f"B0{band_desc[1]}"
+                        
+                        if band_desc in self.band_order:
+                            band_data[band_desc] = data[i]
+                            self.present_bands.add(band_desc)
+
+                    # Create ordered array with placeholders for missing bands
+                    self._create_ordered_array(band_data)
+            else:
+                # Fallback: use the first available subdataset
+                with rio.open(subdatasets[0]) as src:
+                    data = src.read()
+                    self.image = np.transpose(data, (1, 2, 0))  # (height, width, bands)
 
     def _create_ordered_array(self, band_data: Dict[str, np.ndarray]):
         """Create ordered array with NaN placeholders for missing bands."""
@@ -362,6 +414,319 @@ class Sentinel2Image(SatelliteImage):
             "20m": ["B05", "B06", "B07", "B8A", "B11", "B12"],
             "60m": ["B01", "B09", "B10"],
         }
+    
+    def _load_all_resolution_bands(self, subdatasets: List[str], target_resolution: str = "10m"):
+        """
+        Load all bands from multiple resolution subdatasets and resample to target resolution.
+        Applies clipping during loading if clip_geometry is specified for efficiency.
+        
+        Parameters:
+        -----------
+        subdatasets : List[str]
+            List of subdataset URIs
+        target_resolution : str
+            Target resolution to resample all bands to ("10m", "20m", "60m")
+        """
+        from rasterio.warp import reproject, Resampling
+        from rasterio.enums import Resampling as ResamplingEnum
+        from rasterio.windows import from_bounds
+        
+        # Find subdatasets by resolution
+        resolution_subdatasets = {}
+        for subdataset in subdatasets:
+            if ":10m:" in subdataset:
+                resolution_subdatasets["10m"] = subdataset
+            elif ":20m:" in subdataset:
+                resolution_subdatasets["20m"] = subdataset
+            elif ":60m:" in subdataset:
+                resolution_subdatasets["60m"] = subdataset
+        
+        if not resolution_subdatasets:
+            raise ValueError("No resolution subdatasets found")
+        
+        # Get target resolution parameters
+        target_subdataset = resolution_subdatasets.get(target_resolution)
+        if not target_subdataset:
+            # Fallback to 10m if target not available
+            target_resolution = "10m"
+            target_subdataset = resolution_subdatasets.get(target_resolution)
+        
+        if not target_subdataset:
+            raise ValueError("No suitable target resolution found")
+        
+        # Calculate clipping window if geometry provided
+        clip_window = None
+        if self.clip_geometry is not None:
+            clip_window = self._calculate_clip_window(target_subdataset)
+            if clip_window is None:
+                print("Warning: Invalid clip window, loading full image")
+        
+        # Get target grid parameters (from clipped region if applicable)
+        with rio.open(target_subdataset) as target_ds:
+            if clip_window:
+                target_width = int(clip_window.width)
+                target_height = int(clip_window.height)
+                from rasterio.windows import transform as window_transform
+                target_transform = window_transform(clip_window, target_ds.transform)
+            else:
+                target_width = target_ds.width
+                target_height = target_ds.height
+                target_transform = target_ds.transform
+            target_crs = target_ds.crs
+        
+        # Load and resample all bands
+        band_data = {}
+        for resolution, subdataset in resolution_subdatasets.items():
+            with rio.open(subdataset) as src:
+                # Calculate appropriate window for this resolution
+                if clip_window and resolution != target_resolution:
+                    # Scale window to match resolution ratio
+                    scale_factor = self._get_resolution_scale_factor(target_resolution, resolution)
+                    res_window = self._scale_window(clip_window, scale_factor)
+                else:
+                    res_window = clip_window
+                
+                for i in range(src.count):
+                    # Parse band name from description
+                    band_desc = src.descriptions[i].split(",")[0] if src.descriptions[i] else f"Band_{i + 1}"
+                    # Handle naming convention (B2 vs B02)
+                    if band_desc.startswith('B') and len(band_desc) == 2:
+                        band_desc = f"B0{band_desc[1]}"
+                    
+                    if band_desc in self.band_order:
+                        try:
+                            # Read the band (with clipping if window specified)
+                            if res_window:
+                                band_array = src.read(i + 1, window=res_window)
+                            else:
+                                band_array = src.read(i + 1)
+                        except Exception as e:
+                            print(f"Error reading band {band_desc} from {resolution}: {e}")
+                            if res_window:
+                                print(f"Window: {res_window.width} x {res_window.height}")
+                            continue
+                        
+                        if resolution == target_resolution:
+                            # No resampling needed
+                            band_data[band_desc] = band_array
+                        else:
+                            # Resample to target resolution
+                            resampled_array = np.empty((target_height, target_width), dtype=band_array.dtype)
+                            
+                            # Get source transform for this window
+                            if res_window:
+                                from rasterio.windows import transform as window_transform
+                                src_transform = window_transform(res_window, src.transform)
+                            else:
+                                src_transform = src.transform
+                            
+                            reproject(
+                                band_array,
+                                resampled_array,
+                                src_transform=src_transform,
+                                src_crs=src.crs,
+                                dst_transform=target_transform,
+                                dst_crs=target_crs,
+                                resampling=ResamplingEnum.bilinear
+                            )
+                            band_data[band_desc] = resampled_array
+                        
+                        self.present_bands.add(band_desc)
+        
+        # Create ordered array with placeholders for missing bands
+        self._create_ordered_array(band_data)
+    
+    def _calculate_clip_window(self, reference_subdataset: str):
+        """Calculate clipping window from geometry for the reference subdataset."""
+        import geopandas as gpd
+        from rasterio.windows import from_bounds
+        
+        # Handle different geometry types
+        if hasattr(self.clip_geometry, 'geometry'):
+            # It's a GeoDataFrame
+            gdf = self.clip_geometry
+        else:
+            # It's a geometry - create a GeoDataFrame
+            gdf = gpd.GeoDataFrame([1], geometry=[self.clip_geometry], crs="EPSG:4326")
+        
+        # Get CRS from reference subdataset
+        with rio.open(reference_subdataset) as ref_ds:
+            target_crs = ref_ds.crs
+            
+            # Reproject geometry to match image CRS if needed
+            if gdf.crs != target_crs:
+                gdf = gdf.to_crs(target_crs)
+            
+            # Apply buffer if specified
+            if self.buffer_meters > 0:
+                gdf_buffered = gdf.copy()
+                gdf_buffered.geometry = gdf.geometry.buffer(self.buffer_meters)
+                bounds = gdf_buffered.total_bounds
+            else:
+                bounds = gdf.total_bounds
+            
+            # Calculate window from bounds
+            window = from_bounds(
+                bounds[0], bounds[1], bounds[2], bounds[3],  # left, bottom, right, top
+                transform=ref_ds.transform
+            )
+            
+            # Round and clip to dataset bounds
+            from rasterio.windows import Window
+            window = window.round_lengths().round_offsets()
+            dataset_window = Window(0, 0, ref_ds.width, ref_ds.height)
+            window = window.intersection(dataset_window)
+            
+            # Ensure window has valid dimensions
+            if window.width <= 0 or window.height <= 0:
+                print(f"Warning: Invalid window dimensions: {window.width} x {window.height}")
+                print(f"Bounds: {bounds}")
+                print(f"Dataset size: {ref_ds.width} x {ref_ds.height}")
+                print(f"Transform: {ref_ds.transform}")
+                return None
+            
+            print(f"Calculated clip window: {window.width} x {window.height} at ({window.col_off}, {window.row_off})")
+            return window
+    
+    def _get_resolution_scale_factor(self, target_res: str, source_res: str) -> float:
+        """Get scale factor between resolutions."""
+        resolution_values = {"10m": 10, "20m": 20, "60m": 60}
+        return resolution_values[source_res] / resolution_values[target_res]
+    
+    def _scale_window(self, window, scale_factor: float):
+        """Scale a window by the given factor."""
+        from rasterio.windows import Window
+        if window is None:
+            return None
+            
+        scaled = Window(
+            col_off=window.col_off / scale_factor,  # Inverse scaling for higher resolution
+            row_off=window.row_off / scale_factor,
+            width=window.width / scale_factor,
+            height=window.height / scale_factor
+        ).round_lengths().round_offsets()
+        
+        # Ensure valid dimensions
+        if scaled.width <= 0 or scaled.height <= 0:
+            print(f"Warning: Invalid scaled window: {scaled.width} x {scaled.height}")
+            return None
+            
+        return scaled
+    
+    def clip_to_bounds(self, bounds, buffer_pixels: int = 0):
+        """
+        Clip image data to specified bounds.
+        
+        Parameters:
+        -----------
+        bounds : tuple or BoundingBox
+            Bounds to clip to (left, bottom, right, top) or rasterio BoundingBox
+        buffer_pixels : int
+            Number of pixels to add as buffer around the clipped area
+            
+        Returns:
+        --------
+        Sentinel2Image
+            New Sentinel2Image instance with clipped data
+        """
+        if self.image is None or not hasattr(self, 'meta'):
+            raise ValueError("Image and metadata must be loaded before clipping")
+        
+        from rasterio.coords import BoundingBox
+        from rasterio.windows import from_bounds
+        from copy import deepcopy
+        
+        # Ensure bounds is a BoundingBox
+        if not isinstance(bounds, BoundingBox):
+            bounds = BoundingBox(*bounds)
+        
+        # Calculate window from bounds
+        window = from_bounds(
+            bounds.left, bounds.bottom, bounds.right, bounds.top,
+            transform=self.meta['transform']
+        )
+        
+        # Apply buffer if specified
+        if buffer_pixels > 0:
+            window = window.expand(buffer_pixels)
+        
+        # Round window to integer pixels
+        window = window.round_lengths().round_offsets()
+        
+        # Clip the window to image boundaries  
+        from rasterio.windows import Window
+        image_window = Window(0, 0, self.meta['width'], self.meta['height'])
+        window = window.intersection(image_window)
+        
+        if window.width <= 0 or window.height <= 0:
+            raise ValueError("Clipping bounds do not intersect with image")
+        
+        # Extract the clipped data
+        row_slice = slice(int(window.row_off), int(window.row_off + window.height))
+        col_slice = slice(int(window.col_off), int(window.col_off + window.width))
+        
+        clipped_image = self.image[row_slice, col_slice, :]
+        
+        # Create new instance with clipped data
+        clipped_s2 = self.__class__.__new__(self.__class__)
+        clipped_s2.path = self.path
+        clipped_s2.present_bands = self.present_bands.copy()
+        clipped_s2.band_status = self.band_status.copy()
+        clipped_s2.tags = self.tags.copy()
+        clipped_s2.image = clipped_image
+        
+        # Update metadata
+        clipped_s2.meta = deepcopy(self.meta)
+        clipped_s2.meta['width'] = int(window.width)
+        clipped_s2.meta['height'] = int(window.height)
+        
+        # Update transform
+        from rasterio.windows import transform as window_transform
+        clipped_s2.meta['transform'] = window_transform(window, self.meta['transform'])
+        
+        return clipped_s2
+    
+    def clip_to_geometry(self, geometry, buffer_meters: float = 0):
+        """
+        Clip image data to a geometry (e.g., from a GeoDataFrame).
+        
+        Parameters:
+        -----------
+        geometry : shapely geometry or GeoDataFrame
+            Geometry to clip to
+        buffer_meters : float
+            Buffer distance in meters to add around the geometry
+            
+        Returns:
+        --------
+        Sentinel2Image
+            New Sentinel2Image instance with clipped data
+        """
+        import geopandas as gpd
+        from shapely.geometry import box
+        
+        # Handle GeoDataFrame input
+        if hasattr(geometry, 'geometry'):
+            # It's a GeoDataFrame
+            gdf = geometry
+        else:
+            # It's a geometry - create a GeoDataFrame
+            gdf = gpd.GeoDataFrame([1], geometry=[geometry], crs="EPSG:4326")
+        
+        # Reproject to image CRS if needed
+        if gdf.crs != self.meta['crs']:
+            gdf = gdf.to_crs(self.meta['crs'])
+        
+        # Apply buffer if specified
+        if buffer_meters > 0:
+            gdf_buffered = gdf.copy()
+            gdf_buffered.geometry = gdf.geometry.buffer(buffer_meters)
+            geometry_bounds = gdf_buffered.total_bounds
+        else:
+            geometry_bounds = gdf.total_bounds
+        
+        # Clip to bounding box first
+        return self.clip_to_bounds(geometry_bounds)
 
 
 class SatelliteImageCollection(ABC):

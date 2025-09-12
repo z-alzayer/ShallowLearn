@@ -17,12 +17,16 @@ from tqdm import tqdm
 
 import ShallowLearn.ExtractMetadata as extract_meta
 import ShallowLearn.FileProcessing as fp
+from ShallowLearn.API_Utils import filter_by_indices, filter_by_label
+
 # Transform functions moved to core.array_utils
 from ShallowLearn.core.array_utils import LCE_multi
-from ShallowLearn.API_Utils import filter_by_indices, filter_by_label
+
 # LoadData module removed - will need to update these imports later
 # from ShallowLearn.LoadData import LoadSentinel2L1C as load_sen2
 # from ShallowLearn.LoadData import PVI_Dataloader
+from ShallowLearn.io import load_image
+
 
 # Temporary PVI (Preview Image Files) loader - can be updated for API loading later
 class PVI_Dataloader:
@@ -30,37 +34,44 @@ class PVI_Dataloader:
     Preview Image Files (PVI) data loader for ZIP files containing Sentinel-2 preview images.
     This is a temporary implementation that can be extended for API-based loading.
     """
-    
+
     def __init__(self, data_source: str):
         self.data_source = data_source
         self.is_zip = data_source.endswith(".zip")
-        
+
         if self.is_zip:
             try:
                 import zipfile
-                import rasterio
-                
-                with zipfile.ZipFile(data_source, 'r') as zip_ref:
+
+                with zipfile.ZipFile(data_source, "r") as zip_ref:
                     # Find PVI files in the ZIP
-                    pvi_files = [f for f in zip_ref.namelist() if "PVI" in f and f.endswith(".jp2")]
+                    pvi_files = [
+                        f
+                        for f in zip_ref.namelist()
+                        if "PVI" in f and f.endswith(".jp2")
+                    ]
                     if not pvi_files:
                         raise ValueError(f"No PVI files found in {data_source}")
                     self.files = pvi_files[0]  # Take first PVI file
             except Exception as e:
-                print(f"File: {data_source} failed. Please double check integrity of file")
+                print(
+                    f"File: {data_source} failed. Please double check integrity of file"
+                )
                 raise e
-        
+
         self.zip_path = f"zip+file://{data_source}/{self.files}"
-    
+
     def load(self) -> np.ndarray:
         """Load Preview Image Files data from ZIP file."""
         import rasterio
-        
+
         with rasterio.open(self.zip_path) as dataset:
             pvi_image = dataset.read()
             # Transpose from (bands, height, width) to (height, width, bands)
             pvi_image = np.transpose(pvi_image, (1, 2, 0))
         return pvi_image
+
+
 from ShallowLearn.Util import clip_image
 
 
@@ -436,7 +447,7 @@ class QuickLookPVI(QuickLookModel):
         self.PVI = True
         # Initialize load_zips default
         self.load_zips = False
-        
+
         if len(files) <= 1 and os.path.isdir(files):
             files = fp.extract_pvi_images(files)
             self.load_zips = False
@@ -600,7 +611,7 @@ class QuickLookArea(QuickLookModel):
         self.updated_files = []
         for file in tqdm(self.files, desc="Processing files"):
             # print(file)
-            image = load_sen2(file)
+            image = load_image(file)
             clipped = image.clip_raster_with_shape(
                 self.shapefile, resolution, selected_bands=band_mapping, use_mask=False
             )
@@ -646,4 +657,3 @@ class QuickLookArea(QuickLookModel):
             labels = clust.fit_predict(self.transformed_data)
             self.df["Label"] = labels
             return self.df["Label"]
-

@@ -2,15 +2,10 @@ import numpy as np
 from skimage.filters import threshold_multiotsu
 from skimage.segmentation import felzenszwalb, quickshift, slic, watershed
 from skimage.transform import resize
+from sklearn.cluster import DBSCAN
 from sklearn.decomposition import PCA
 
-try:
-    from fast_slic.avx2 import SlicAvx2
-except:
-    print("Faster slic not available")
-from sklearn.cluster import DBSCAN
-
-import ShallowLearn.ImageHelper as ih
+from ShallowLearn.core import array_utils
 
 
 def felzenszwalb_segmentation(image, scale=100, sigma=0.5, min_size=50):
@@ -21,24 +16,13 @@ def felzenszwalb_segmentation(image, scale=100, sigma=0.5, min_size=50):
 def slic_segmentation(
     image, n_segments=300, compactness=10, sigma=1, faster_slic=False
 ):
-    # segments_slic = Slic(image, num_components=n_segments, compactness=compactness, sigma=sigma, start_label=1)
-    if faster_slic:
-        slic_fast = SlicAvx2(
-            num_components=n_segments,
-            convert_to_lab=False,
-            compactness=compactness,
-            min_size_factor=0.25,
-            subsample_stride=10,
-        )
-        segments_slic = slic_fast.iterate(image)
-    else:
-        segments_slic = slic(
-            image,
-            n_segments=n_segments,
-            compactness=compactness,
-            sigma=sigma,
-            start_label=1,
-        )
+    segments_slic = slic(
+        image,
+        n_segments=n_segments,
+        compactness=compactness,
+        sigma=sigma,
+        start_label=1,
+    )
 
     return segments_slic
 
@@ -125,10 +109,14 @@ def gen_dii(image):
     super_pixel = generate_sup_pixel_labels(image)
     print(np.unique(super_pixel))
     mean_1 = np.mean(
-        ih.apply_mask(image, np.expand_dims(super_pixel == 1, axis=2))[:, :, -1]
+        array_utils.apply_mask(image, np.expand_dims(super_pixel == 1, axis=2))[
+            :, :, -1
+        ]
     )
     mean_2 = np.mean(
-        ih.apply_mask(image, np.expand_dims(super_pixel == 0, axis=2))[:, :, -1]
+        array_utils.apply_mask(image, np.expand_dims(super_pixel == 0, axis=2))[
+            :, :, -1
+        ]
     )
     if mean_1 < mean_2:
         mask_shallow = super_pixel == 0
@@ -168,4 +156,3 @@ def ostu_filter(dii_image):
     thresholds = threshold_multiotsu(dii_image[:, :, [2]])
     regions = np.digitize(dii_image[:, :, [2]], bins=thresholds)
     return regions == 2
-
