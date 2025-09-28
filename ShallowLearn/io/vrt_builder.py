@@ -457,7 +457,8 @@ class Sentinel2VRTBuilder(VRTBuilder):
         vsi_paths = [f"/vsizip/{archive_path}/{band_file}" for band_file in target_resolution_bands]
         
         # Get reference band info - just open once quickly
-        ref_vsi_path = f"/vsizip/{archive_path}/{target_resolution_bands[0]}"
+        # Hard coded to Band 1 since its almost always 10m - dynamic finding #TODO would be a good idea at some point
+        ref_vsi_path = f"/vsizip/{archive_path}/{target_resolution_bands[1]}"
         ref_ds = gdal.Open(ref_vsi_path)
         if not ref_ds:
             raise RuntimeError(f"Could not open reference band: {ref_vsi_path}")
