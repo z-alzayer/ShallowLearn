@@ -1163,5 +1163,367 @@ class GeoTIFFCollection:
         return f"<GeoTIFFCollection: {len(self.files)} files in {self.directory.name}>"
 
 
+class SpotImage(SatelliteImage):
+    """SPOT satellite image with metadata handling and band ordering."""
+
+    # SPOT band characteristics based on satellite generation
+    BAND_INFO = {
+        "S1": {  # SPOT 1 (1986-1990)
+            "HRV": {
+                "P": ["PAN"],  # Panchromatic
+                "X": ["XS1", "XS2", "XS3"],  # Multispectral
+            }
+        },
+        "S2": {  # SPOT 2 (1990-2007)
+            "HRV": {
+                "P": ["PAN"],  # Panchromatic
+                "X": ["XS1", "XS2", "XS3"],  # Multispectral
+            }
+        },
+        "S4": {  # SPOT 4 (1998-2013)
+            "HRVIR": {
+                "I": ["XS1", "XS2", "XS3", "SWIR"],  # Infrared mode: 4-band multispectral + SWIR
+                "M": ["XS1"],  # Multispectral mode: single band
+            }
+        },
+        "S5": {  # SPOT 5 (2002-2015)
+            "HRG": {
+                "A": ["XS1", "XS2", "XS3", "SWIR"],  # Band A: Multispectral
+                "B": ["XS1", "XS2", "XS3", "SWIR"],  # Band B: Multispectral
+                "J": ["XS1", "XS2", "XS3", "SWIR"],  # JPEG compressed
+            },
+            "HRS": {"S": ["PAN"]},  # Stereo panchromatic
+        },
+    }
+
+    def __init__(self, file_path: str):
+        """
+        Initialize SPOT image.
+
+        Parameters:
+        -----------
+        file_path : str
+            Path to SPOT VRT file
+        """
+        self.spot_tags = {}
+        self.satellite_info = {}
+        self.band_descriptions = []
+        self.read_successful = True
+        super().__init__(file_path)
+
+    @property
+    def band_order(self) -> Dict[str, int]:
+        """
+        Dynamic band order based on actual bands present in the image.
+
+        This is determined during _load_image() and creates a mapping
+        of band names (XS1, XS2, XS3, SWIR, PAN, NIR) to their indices.
+        """
+        if not hasattr(self, '_band_order'):
+            # Default empty order if not yet loaded
+            return {}
+        return self._band_order
+
+    def _load_image(self):
+        """Load SPOT image data from VRT file."""
+        with rio.open(self.path) as src:
+            # Store metadata
+            self.meta = src.meta.copy()
+            self.tags = src.tags()
+            self.spot_tags = src.tags(ns="SPOT")
+
+            # Extract SPOT-specific information first
+            self._parse_spot_metadata()
+
+            # Try to read all available bands
+            band_data = {}
+            try:
+                for i in range(src.count):
+                    # Use actual band description from VRT (XS1, XS2, etc.)
+                    band_desc = (
+                        src.descriptions[i] if src.descriptions[i] else f"Band_{i+1}"
+                    )
+                    band_data[band_desc] = src.read(i + 1)
+                    self.present_bands.add(band_desc)
+                    self.band_descriptions.append(band_desc)
+
+                # Create ordered array based on band descriptions
+                if band_data:
+                    # Build dynamic band_order mapping
+                    self._band_order = {
+                        band_name: idx
+                        for idx, band_name in enumerate(self.band_descriptions)
+                    }
+
+                    # Stack bands in order
+                    ordered_bands = [band_data[band_name] for band_name in self.band_descriptions]
+                    self.image = np.stack(ordered_bands, axis=0)
+                    self.image = np.transpose(self.image, (1, 2, 0))  # (height, width, channels)
+                else:
+                    self.image = np.empty((0, 0, 0))
+                    self._band_order = {}
+
+            except Exception as e:
+                # Handle missing intermediate files gracefully
+                print(f"Warning: Could not read image data for {self.path.name}: {e}")
+                self.image = np.empty((0, 0, 0))
+                self.read_successful = False
+                self._band_order = {}
+                # Still populate band info from metadata
+                for i in range(src.count):
+                    self.present_bands.add(f"Band_{i+1}")
+
+    def _parse_spot_metadata(self):
+        """Parse SPOT-specific metadata from VRT tags."""
+        if self.spot_tags:
+            self.satellite_info = {
+                "satellite": self.spot_tags.get("SATELLITE", "Unknown"),
+                "instrument": self.spot_tags.get("INSTRUMENT", "Unknown"),
+                "processing_type": self.spot_tags.get("PROCESSING_TYPE", "Unknown"),
+                "processing_level": self.spot_tags.get("PROCESSING_LEVEL", "Unknown"),
+                "correction_type": self.spot_tags.get("CORRECTION_TYPE", "Unknown"),
+                "path_row": self.spot_tags.get("PATH_ROW", "Unknown"),
+                "satellite_type": "spot",
+            }
+
+            # Parse acquisition date/time
+            acq_date = self.spot_tags.get("ACQUISITION_DATE")
+            acq_time = self.spot_tags.get("ACQUISITION_TIME")
+            if acq_date and acq_time:
+                try:
+                    from datetime import datetime
+                    self.satellite_info["acquisition_datetime"] = datetime.strptime(
+                        f"{acq_date} {acq_time}", "%Y-%m-%d %H:%M:%S"
+                    )
+                except ValueError:
+                    self.satellite_info["acquisition_datetime"] = None
+        else:
+            # Fallback: try to parse from filename if no SPOT metadata
+            self.satellite_info = self._parse_filename_metadata()
+
+    def _parse_filename_metadata(self) -> Dict:
+        """Parse metadata from SPOT filename if VRT metadata not available."""
+
+        filename = self.path.stem
+
+        # SPOT filename pattern: 001-002_S5_173-309-8_2002-07-26-06-52-08_HRG-2_J_MX_KK
+        parts = filename.split("_")
+
+        if len(parts) >= 6:
+            try:
+                return {
+                    "satellite": parts[1] if len(parts) > 1 else "Unknown",
+                    "instrument": parts[4] if len(parts) > 4 else "Unknown",
+                    "processing_type": parts[5] if len(parts) > 5 else "Unknown",
+                    "processing_level": parts[6] if len(parts) > 6 else "Unknown",
+                    "correction_type": parts[7] if len(parts) > 7 else "Unknown",
+                    "path_row": parts[2] if len(parts) > 2 else "Unknown",
+                    "satellite_type": "spot",
+                    "acquisition_datetime": (
+                        self._parse_date_from_filename(parts[3])
+                        if len(parts) > 3
+                        else None
+                    ),
+                }
+            except Exception:
+                pass
+
+        return {"satellite_type": "spot"}
+
+    def _parse_date_from_filename(self, date_str: str):
+        """Parse datetime from SPOT filename date string."""
+        from datetime import datetime
+
+        try:
+            return datetime.strptime(date_str, "%Y-%m-%d-%H-%M-%S")
+        except ValueError:
+            return None
+
+    def get_band_info(self) -> Dict:
+        """
+        Get information about expected bands for this SPOT configuration.
+
+        Returns:
+        --------
+        Dict
+            Dictionary with expected_bands, satellite, instrument, and processing_type
+        """
+        satellite = self.satellite_info.get("satellite", "").upper()
+        instrument = self.satellite_info.get("instrument", "").upper()
+        processing_type = self.satellite_info.get("processing_type", "").upper()
+
+        # Extract base instrument name (remove -1, -2 suffix)
+        base_instrument = instrument.split("-")[0] if "-" in instrument else instrument
+
+        if satellite in self.BAND_INFO and base_instrument in self.BAND_INFO[satellite]:
+            instrument_info = self.BAND_INFO[satellite][base_instrument]
+            if processing_type in instrument_info:
+                return {
+                    "expected_bands": instrument_info[processing_type],
+                    "satellite": satellite,
+                    "instrument": instrument,
+                    "processing_type": processing_type,
+                }
+
+        return {
+            "expected_bands": [],
+            "satellite": satellite,
+            "instrument": instrument,
+            "processing_type": processing_type,
+        }
+
+    def get_acquisition_date(self):
+        """Get acquisition date/time."""
+        return self.satellite_info.get("acquisition_datetime")
+
+    def get_pixel_resolution(self) -> float:
+        """
+        Get pixel resolution in meters based on satellite/instrument.
+
+        Returns:
+        --------
+        float
+            Pixel resolution in meters
+        """
+        satellite = self.satellite_info.get("satellite", "")
+        instrument = self.satellite_info.get("instrument", "")
+
+        # Pixel resolution mapping
+        resolutions = {
+            "S1": {"HRV-1": 20.0, "HRV-2": 20.0},  # 20m multispectral, 10m pan
+            "S2": {"HRV-1": 20.0, "HRV-2": 20.0},
+            "S4": {"HRVIR-1": 20.0, "HRVIR-2": 20.0},
+            "S5": {"HRG-1": 10.0, "HRG-2": 10.0, "HRS-1": 10.0, "HRS-2": 10.0},
+        }
+
+        return resolutions.get(satellite, {}).get(instrument, 20.0)
+
+    def get_landsat_sentinel_equivalents(self) -> Dict[str, str]:
+        """
+        Get Landsat/Sentinel equivalent band names for SPOT bands.
+
+        This helps understand SPOT bands in the context of more common satellites.
+
+        Returns:
+        --------
+        Dict[str, str]
+            Mapping of SPOT band names to their Landsat/Sentinel equivalents
+        """
+        spot_to_landsat_sentinel = {
+            # SPOT multispectral bands to Landsat/Sentinel equivalents
+            "XS1": "Green (B3/B03)",  # Green: 0.50-0.59 μm
+            "XS2": "Red (B4/B04)",  # Red: 0.61-0.68 μm
+            "XS3": "NIR (B5/B08)",  # Near Infrared: 0.79-0.89 μm
+            "SWIR": "SWIR1 (B6/B11)",  # Short Wave Infrared: 1.58-1.75 μm
+            "PAN": "Pan (B8/B08)",  # Panchromatic
+            "NIR": "NIR (B5/B08)",  # Direct NIR band
+        }
+
+        # Map current bands to their equivalents
+        equivalents = {}
+        for band_name in self.band_descriptions:
+            if band_name in spot_to_landsat_sentinel:
+                equivalents[band_name] = spot_to_landsat_sentinel[band_name]
+            else:
+                equivalents[band_name] = f"Unknown ({band_name})"
+
+        return equivalents
+
+    def get_band_wavelengths(self) -> Dict[str, str]:
+        """
+        Get approximate wavelength ranges for SPOT bands.
+
+        Returns:
+        --------
+        Dict[str, str]
+            Mapping of SPOT band names to their wavelength ranges
+        """
+        spot_wavelengths = {
+            "XS1": "0.50-0.59 μm",  # Green
+            "XS2": "0.61-0.68 μm",  # Red
+            "XS3": "0.79-0.89 μm",  # Near Infrared
+            "SWIR": "1.58-1.75 μm",  # Short Wave Infrared
+            "PAN": "0.48-0.71 μm",  # Panchromatic (broad visible)
+            "NIR": "0.79-0.89 μm",  # Near Infrared
+        }
+
+        # Map current bands to their wavelengths
+        wavelengths = {}
+        for band_name in self.band_descriptions:
+            if band_name in spot_wavelengths:
+                wavelengths[band_name] = spot_wavelengths[band_name]
+            else:
+                wavelengths[band_name] = "Unknown"
+
+        return wavelengths
+
+    def get_rgb_bands(self) -> Tuple[str, str, str]:
+        """
+        Get RGB band combination for SPOT imagery.
+
+        SPOT typically uses:
+        - Red: XS2 (0.61-0.68 μm)
+        - Green: XS1 (0.50-0.59 μm)
+        - Blue: Not available in standard SPOT, use XS1 or fallback
+
+        For true-color visualization, SPOT images need special handling
+        since they lack a blue band. A common approach is to use NIR-Red-Green
+        for false color composites.
+
+        Returns:
+        --------
+        Tuple[str, str, str]
+            Band names for (Red, Green, Blue/NIR) visualization
+        """
+        # Check what bands are available
+        if "XS2" in self.present_bands and "XS1" in self.present_bands:
+            if "XS3" in self.present_bands:
+                # NIR-Red-Green false color composite (common for SPOT)
+                # This provides good visual contrast for vegetation/land features
+                return ("XS3", "XS2", "XS1")  # NIR, Red, Green
+            else:
+                # If no NIR, use Red-Green-Green (limited true color approximation)
+                return ("XS2", "XS1", "XS1")  # Red, Green, Green
+
+        # Fallback to first 3 bands if standard bands not found
+        if len(self.band_descriptions) >= 3:
+            return tuple(self.band_descriptions[:3])
+        elif len(self.band_descriptions) == 2:
+            return (self.band_descriptions[0], self.band_descriptions[1], self.band_descriptions[1])
+        elif len(self.band_descriptions) == 1:
+            return (self.band_descriptions[0], self.band_descriptions[0], self.band_descriptions[0])
+
+        # Last resort fallback
+        return ("XS2", "XS1", "XS1")
+
+    def get_spectral_bands(self) -> List[str]:
+        """Get list of spectral bands (excluding non-spectral bands)."""
+        return self.band_descriptions.copy()
+
+    def __repr__(self):
+        """String representation of SpotImage."""
+        sat_info = self.satellite_info
+        acq_date = sat_info.get("acquisition_datetime")
+        date_str = acq_date.strftime("%Y-%m-%d") if acq_date else "Unknown"
+
+        # Show actual band names
+        bands_str = ", ".join(self.band_descriptions) if self.band_descriptions else f"{len(self.present_bands)} bands"
+
+        # Build band status similar to base class
+        band_list = [f"{b} ✓" for b in self.band_descriptions]
+
+        return (
+            f"<SpotImage: {self.path.name}\n"
+            f"  Satellite: {sat_info.get('satellite', 'Unknown')} "
+            f"Instrument: {sat_info.get('instrument', 'Unknown')}\n"
+            f"  Processing: {sat_info.get('processing_type', 'Unknown')} "
+            f"Level: {sat_info.get('processing_level', 'Unknown')}\n"
+            f"  Date: {date_str}\n"
+            f"  Bands: {band_list}\n"
+            f"  Shape: {self.image.shape if self.image is not None else 'Not loaded'}\n"
+            f"  Resolution: {self.get_pixel_resolution()}m>"
+        )
+
+
 # Backwards compatibility alias
 LoadGeoTIFF = GeoTIFFImage
