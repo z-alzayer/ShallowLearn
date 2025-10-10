@@ -121,6 +121,7 @@ class LandsatVRTBuilder(VRTBuilder):
         bounds: Optional[gpd.GeoDataFrame] = None,
         n_pixels: int = 10,
         pixel_size: float = 30,
+        file_name_out = None,
         **kwargs,
     ) -> str:
         """
@@ -168,7 +169,8 @@ class LandsatVRTBuilder(VRTBuilder):
         # Crop VRT if bounds provided
         if bounds is not None:
             cropped_vrt_path = self.output_dir / f"{vrt_base}_cropped.vrt"
-
+        if file_name_out is not None:
+            cropped_vrt_path = self.output_dir / f"{vrt_base}_cropped_{file_name_out}.vrt"
             # Expand and transform bounds
             expanded_bounds = self.expand_bounds(
                 bounds.total_bounds, n_pixels, pixel_size
@@ -376,6 +378,7 @@ class Sentinel2VRTBuilder(VRTBuilder):
         n_pixels: int = 10,
         pixel_size: float = 10,
         target_resolution: str = "10m",
+        file_name_out = None,
         **kwargs,
     ) -> str:
         """
@@ -409,6 +412,8 @@ class Sentinel2VRTBuilder(VRTBuilder):
         else:
             final_vrt_path = self.output_dir / f"{vrt_base}_{target_resolution}.vrt"
 
+        if file_name_out is not None:
+            final_vrt_path = self.output_dir / f"{vrt_base}_{target_resolution}_{file_name_out}.vrt"
         # Single pass through ZIP file to get everything we need
         band_files = []
         metadata = {}
@@ -455,10 +460,9 @@ class Sentinel2VRTBuilder(VRTBuilder):
 
         # Build /vsizip/ paths for TARGET RESOLUTION bands only
         vsi_paths = [f"/vsizip/{archive_path}/{band_file}" for band_file in target_resolution_bands]
-        
         # Get reference band info - just open once quickly
         # Hard coded to Band 1 since its almost always 10m - dynamic finding #TODO would be a good idea at some point
-        ref_vsi_path = f"/vsizip/{archive_path}/{target_resolution_bands[1]}"
+        ref_vsi_path = f"/vsizip/{archive_path}/{target_resolution_bands[2]}"
         ref_ds = gdal.Open(ref_vsi_path)
         if not ref_ds:
             raise RuntimeError(f"Could not open reference band: {ref_vsi_path}")

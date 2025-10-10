@@ -14,7 +14,7 @@ from shapely.geometry import box
 from shapely.ops import unary_union
 
 from ..core.array_utils import clip_array
-from .satellite_data import GeoTIFFImage, LandsatImage, Sentinel2Image
+from .satellite_data import GeoTIFFImage, LandsatImage, Sentinel2Image, SpotImage
 
 
 def load_image(
@@ -23,6 +23,7 @@ def load_image(
     clip: bool = False,
     file_format: Optional[str] = None,
     gdf_clip: Optional[object] = None,
+    return_sat_object = False,
 ) -> Union[np.ndarray, Tuple[np.ndarray, dict, object]]:
     """
     High-level image loading function with auto-detection and proper orientation.
@@ -39,10 +40,12 @@ def load_image(
     clip : bool, default False
         Whether to clip values to 0-10000 range
     file_format : str, optional
-        Force specific format handling ('geotiff', 'sentinel2', 'landsat')
+        Force specific format handling ('geotiff', 'sentinel2', 'landsat', 'spot')
         If None, format is auto-detected
     gdf_clip : GeoDataFrame, optional
         GeoDataFrame with geometries for clipping the image. If provided, the image will be clipped to the geometries
+    return_sat_object: False
+        Returns custom SatelliteImage with additional methods
 
     Returns:
     --------
@@ -77,11 +80,19 @@ def load_image(
         img = loader.image
         if img is None:
             img = loader._load_image()  # Ensure image is loaded
+    elif file_format == "spot":
+        loader = SpotImage(str(path))
+        img = loader.image
+        if img is None:
+            img = loader._load_image()  # Ensure image is loaded
     else:
         # Default to GeoTIFF loader
         loader = GeoTIFFImage(str(path))
         img = loader.load()
 
+    # TODO: Tidy this up so its behaviourally consistent and not an additional state to manage
+    if return_sat_object:
+        return loader
     # Apply legacy transformations for backwards compatibility
     img = _apply_legacy_transformations(img, path)
 
@@ -122,25 +133,55 @@ def _detect_file_format(path: Path) -> str:
     Returns:
     --------
     str
-        Detected format: 'sentinel2', 'landsat', or 'geotiff'
+        Detected format: 'sentinel2', 'landsat', 'spot', or 'geotiff'
     """
     filename = path.name.upper()
 
-    # Check file extension first - VRT files should always use geotiff loader
-    if path.suffix.lower() in [".vrt"]:
-        return "geotiff"
-
-    # Check for Sentinel-2 patterns first (before checking TIF extension)
+    # Check for Sentinel-2 patterns first (highest priority for satellite data)
     if any(pattern in filename for pattern in ["S2A_", "S2B_", "MSIL1C", "MSIL2A"]):
         return "sentinel2"
 
-    # Check for Landsat patterns first (before checking TIF extension)
+    # Check for Landsat patterns
     if any(pattern in filename for pattern in ["LC08", "LC09", "LE07", "LT05", "LT04"]):
         return "landsat"
 
-    # Check file extension for standard geotiff files (after pattern matching)
+    # Check for SPOT patterns
+    # SPOT filename pattern examples:
+    # - 001-002_S5_173-309-8_2002-07-26-06-52-08_HRG-2_J_MX_KK.vrt
+    # - Contains satellite identifier like S1, S2, S4, S5
+    # - Contains instrument like HRV, HRVIR, HRG, HRS
+    if any(pattern in filename for pattern in ["_S1_", "_S2_", "_S4_", "_S5_"]):
+        return "spot"
+
+    # Also check for SPOT instrument names in VRT files
+    if path.suffix.lower() == ".vrt":
+        if any(pattern in filename for pattern in ["HRV", "HRVIR", "HRG", "HRS"]):
+            # Need to verify it's SPOT and not something else
+            # Check if it has SPOT satellite identifier pattern
+            if re.search(r"_S[1-5]_", filename):
+                return "spot"
+
+    # Check file extension for standard geotiff files (after satellite pattern matching)
     if path.suffix.lower() in [".tif", ".tiff"]:
         return "geotiff"
+
+    # For VRT files without clear satellite patterns, try to peek at metadata
+    if path.suffix.lower() == ".vrt":
+        try:
+            with rio.open(path) as src:
+                # Check for SPOT tags in the VRT
+                spot_tags = src.tags(ns="SPOT")
+                if spot_tags and "SATELLITE" in spot_tags:
+                    return "spot"
+
+                # Check band descriptions for SPOT-like patterns (XS1, XS2, etc.)
+                if src.descriptions and any(
+                    desc and re.match(r"^XS\d+$|^SWIR$|^PAN$|^NIR$", desc)
+                    for desc in src.descriptions
+                ):
+                    return "spot"
+        except Exception:
+            pass  # If we can't read it, fall back to geotiff
 
     # Default to geotiff for unknown formats
     return "geotiff"

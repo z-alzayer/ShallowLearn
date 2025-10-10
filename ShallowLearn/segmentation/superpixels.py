@@ -44,6 +44,8 @@ def felzenszwalb_segmentation(
     np.ndarray
         Segmentation labels
     """
+    if image.shape[-1] != 3:
+        image = image[:,:,[4,3,2]]
     return felzenszwalb(image, scale=scale, sigma=sigma, min_size=min_size)
 
 
@@ -75,6 +77,8 @@ def slic_segmentation(
     np.ndarray
         Segmentation labels
     """
+    if image.shape[-1] != 3:
+        image = image[:,:,[4,3,2]]
     return slic(
         image,
         n_segments=n_segments,
@@ -106,6 +110,8 @@ def quickshift_segmentation(
     np.ndarray
         Segmentation labels
     """
+    if image.shape[-1] != 3:
+        image = image[:,:,[4,3,2]]
     return quickshift(image, kernel_size=kernel_size, max_dist=max_dist, ratio=ratio)
 
 
@@ -467,7 +473,8 @@ def create_superpixel_dii_stack(
     correction_factor: int = 10,
     segmentation_method: str = "slic",
     band_combos=None,
-) -> Tuple[np.ndarray, np.ndarray, dict]:
+    method: str = 'linear',
+    method_kwargs: dict = None) -> Tuple[np.ndarray, np.ndarray, dict]:
     """
     Create superpixels and generate DII stack following StandardDII methodology.
 
@@ -483,12 +490,22 @@ def create_superpixel_dii_stack(
         Compactness factor for SLIC segmentation
     segmentation_method : str, default='slic'
         Segmentation method to use
+    band_combos : List[Tuple[int, int]], optional
+        Band combinations for DII calculation
+    method : str, default='linear'
+        Regression method for DII calculation
+    method_kwargs : dict, optional
+        Additional keyword arguments for the chosen method
 
     Returns:
     --------
     Tuple[np.ndarray, np.ndarray, dict]
         (features, segments, results_dict)
     """
+    # Initialize method_kwargs if None
+    if method_kwargs is None:
+        method_kwargs = {}
+    
     # Create superpixel segmentation
     if segmentation_method == "slic":
         segments = slic_segmentation(
@@ -503,8 +520,13 @@ def create_superpixel_dii_stack(
 
     # Process with DII pipeline
     results = process_superpixel_dii_pipeline(
-        image, segments, bands=bands, band_combos=band_combos
+        image, segments, bands=bands, band_combos=band_combos, 
+        method=method, method_kwargs=method_kwargs
     )
+
+    # Debug: Check what results is
+    print(f"Type of results: {type(results)}")
+    print(f"Results keys: {results.keys() if isinstance(results, dict) else 'Not a dict'}")
 
     # Extract features (mean values for each superpixel)
     features = results["features"]
@@ -518,7 +540,8 @@ def process_superpixel_dii_pipeline(
     bands: List[int] = [0, 1, 2],
     n_components: int = 3,
     band_combos: List[Tuple[int, int]] = None,
-) -> dict:
+    method: str = 'linear',
+    method_kwargs: dict = None) -> dict:
     """
     Complete superpixel processing pipeline using StandardDII approach.
 
@@ -534,12 +557,27 @@ def process_superpixel_dii_pipeline(
         Number of components for Gaussian Mixture Model
     band_combos : List[Tuple[int, int]], optional
         Band combinations for DII calculation. If None, uses default combinations.
+    method : str
+        Regression method for DII calculation
+        Options: 'linear', 'polynomial', 'power_law', 'spline'
+        Default: 'linear'
+    method_kwargs : dict, optional
+        Additional keyword arguments for the chosen method:
+        - For 'polynomial': {'poly_degree': int} (default: 2)
+        - For 'spline': {'smoothing': float, 'spline_k': int} (defaults: None, 3)
+        - For 'power_law': no additional parameters needed
+        Examples:
+            {'poly_degree': 3}
+            {'smoothing': 0.1, 'spline_k': 3}
 
     Returns:
     --------
     dict
         Results containing segments, deep/shallow masks, clusters, and DII stack
     """
+    if method_kwargs is None:
+        method_kwargs = {}
+        
     # Default band combinations for DII calculation
     if band_combos is None:
         band_combos = [
@@ -607,20 +645,26 @@ def process_superpixel_dii_pipeline(
         if band1 >= image.shape[2] or band2 >= image.shape[2]:
             continue
 
-        # Calculate slope using StandardDII method
-        ki, (Ls_i, Ls_j) = calculate_slope_from_values(
+        # Calculate model using the specified method
+        model, Ls = calculate_slope_from_values(
             deep_i=deep_pixels[:, band1],
             deep_j=deep_pixels[:, band2],
             shallow_i=shallow_pixels[:, band1],
             shallow_j=shallow_pixels[:, band2],
+            method=method,
+            **method_kwargs
         )
 
         # Apply DII transformation to entire image
         dii_stack[:, :, idx] = apply_depth_invariant_index(
-            image[:, :, band1], image[:, :, band2], ki, (Ls_i, Ls_j)
+            image[:, :, band1], 
+            image[:, :, band2], 
+            model,
+            Ls,
+            method=method
         )
 
-    return {
+    result_dict = {
         "segments": segments,
         "cluster_map": temp_arr,
         "deep_mask": deep_mask,
@@ -634,8 +678,9 @@ def process_superpixel_dii_pipeline(
         "dii_stack": dii_stack,
         "band_combos": band_combos,
     }
-
-
+    
+    print(f"About to return dict with keys: {result_dict.keys()}")
+    return result_dict
 def pad_slice_segments(image: np.ndarray, segments: np.ndarray, shape: Tuple[int, int, int] = (32, 32, 3)) -> np.ndarray:
     """
     Extract and resize patches from image based on segments.

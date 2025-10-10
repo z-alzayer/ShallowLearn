@@ -106,7 +106,7 @@ class ClusteringMethod(ABC):
 class DBSCANClustering(ClusteringMethod):
     """DBSCAN clustering method."""
 
-    def __init__(self, eps: float = 0.5, min_samples: int = 5):
+    def __init__(self, eps: float = 30, min_samples: int = 5):
         self.eps = eps
         self.min_samples = min_samples
 
