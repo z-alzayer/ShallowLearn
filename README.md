@@ -1,39 +1,90 @@
-[![codecov](https://codecov.io/github/z-alzayer/ShallowLearn/graph/badge.svg?token=TKUAGXODRB)](https://codecov.io/github/z-alzayer/ShallowLearn)
+# ShallowLearn — unsupervised methods for shallow-water remote sensing
 
-# ShallowLearn: A Python Toolkit for Shallow Water Remote Sensing Analysis
+Three self-contained notebooks, one method each, worked end to end on data included in this
+repository. Each opens and runs on its own; none depends on a framework, and none needs a
+single labelled pixel. Everything is numpy, scikit-learn, scikit-image and xgboost.
 
-ShallowLearn provides a collection of tools and utilities designed for processing, analyzing, and visualizing satellite imagery, with a particular focus on shallow water environments like coral reefs. It includes functionalities for data loading, preprocessing, feature extraction, segmentation, time-series analysis, and visualization. This repo is a work in progress with improvements to come, I'm still in the process of refactoring now that the paper is published but hopefully I'll get to it sooner rather than later.
+| | | |
+|---|---|---|
+| [**Finding the usable images in an archive**](notebooks/01_pca_image_selection.ipynb) | Which of 536 archived Sentinel-2 scenes are worth downloading? Flatten each whole image into one vector, run PCA over the archive, cluster with DBSCAN. Clear sky falls out as the darkest dense cluster. | ~5 s |
+| [**Masking cloud and land over water**](notebooks/02_cloud_and_land_masking.ipynb) | Water absorbs infrared and clouds do not, so regress infrared response from the visible bands and threshold the prediction. No labelled cloud masks, and unlike a brightness cut it leaves the reef flat standing. Read through its residual, the same fit is an anomaly detector: on a "cloud-free" scene it finds the breaking surf and wisps of haze no threshold would catch. | ~20 s |
+| [**Removing the depth signal**](notebooks/03_superpixel_depth_invariant_index.ipynb) | Lyzenga's depth-invariant index traditionally needs two hand-drawn reference polygons. SLIC superpixels plus PCA and clustering find both, so the result is reproducible from the image alone. | ~30 s |
 
-## Features
+They do compose, in that order, on a real workflow — but each gets the scene that shows its
+own method most clearly, and each states what it assumes about the ones before it. All
+three are committed with their outputs, so GitHub renders every figure without you running
+anything.
 
-*   **Data Handling:**
-    *   Load satellite data from various formats (GeoTIFF, Sentinel-2 SAFE/ZIP).
-    *   Download Sentinel-2 via APIs (`cdsetool`).
-    *   Compile multi-band GeoTIFFs from raw Sentinel-2 bands.
-    *   Handle time series and seasonal data loading.
-*   **Image Processing:**
-    *   Radiometric normalization (PCA-based, Histogram Matching).
-    *   Image transformations (Contrast Enhancement - LCE, BCET, Color Space Conversions - LAB, HSV).
-    *   Cloud detection and masking (XGBoost-based).
-    *   Image resampling operations.
-*   **Feature Extraction:**
-    *   Calculate standard remote sensing indices.
-    *   Extract computer vision features (LBP, Gabor, HOG, Edge Density).
-    *   Generate comprehensive feature stacks combining spectral, index, and texture information.
-*   **Segmentation:**
-    *   Superpixel generation using various algorithms (SLIC, Felzenszwalb, Quickshift, Watershed).
-    *   Superpixel processing pipelines involving PCA and clustering (DBSCAN, OPTICS, GMM).
-*   **Depth Invariant Indices (DII):**
-    *   Calculate standard band-ratio DII.
-    *   Implement superpixel-based DII workflows for automated deep/shallow area identification.
-*   **Time Series Analysis:**
-    *   Process and normalize image time series.
-    *   Quick-look analysis using PCA and clustering on image thumbnails or cropped areas.
-*   **Utilities & Visualization:**
-    *   Helper functions for date extraction, band mapping, and metadata handling.
-    *   Plotting utilities for images, spectra, histograms, scatter plots with image overlays, and density plots.
+## The problem they address
 
+Reef monitoring needs dense satellite time series, and the obstacles are practical rather
+than conceptual. You cannot tell which archived scenes are usable without a human looking at
+them, because scene-level cloud percentages are produced by land-tuned algorithms and
+describe 10 000 km² when a reef occupies a few. Once you have a scene, cloud masks fail over
+water, where thin cirrus and glint look like sea. And water column attenuation makes the
+same substrate read differently at different depths — traditionally corrected by an analyst
+drawing polygons over deep water, a step so rarely documented that published results cannot
+be reproduced.
 
-[Documentation is available here](https://z-alzayer.github.io/ShallowLearn/)
+Each notebook replaces one of those human judgements with an unsupervised one. Every
+parameter is either derived from the image or justified where it appears, and where a result
+cannot be honestly validated the notebook says so rather than reaching for a number.
 
-If you've found any of the code useful please cite our [paper](https://www.mdpi.com/2072-4292/17/7/1244) 
+## Running them
+
+```bash
+git clone https://github.com/z-alzayer/ShallowLearn && cd ShallowLearn
+uv sync && uv run jupyter lab
+```
+
+That is the whole setup. The data is in the repository, so there is nothing to download and
+no credentials to configure — clone, sync, run. `uv.lock` pins the exact package versions
+the committed outputs were produced with, so the environment you get is the one that was
+tested rather than whatever resolves on the day.
+
+Without `uv`: `pip install -r <(uv export --no-hashes)` , or just
+`pip install numpy scipy scikit-learn scikit-image xgboost matplotlib pillow jupyter`.
+
+## What is in here
+
+```
+notebooks/   the three tutorials, with outputs committed
+data/        the three arrays they use, and the script that built them
+```
+
+`data/thumbnails_55LCD.npy` — 536 ESA Preview Images for Sentinel-2 tile 55LCD (Great
+Barrier Reef, 2015–2024), the free ~25 kB quicklooks ESA ships with every product,
+downsampled from 343×343 to 128×128 so the archive fits in git.
+
+`data/reef_cloudy.npy` — one reef clipped from a 55LCD L1C scene (2016-03-23), 604×598 at
+10 m, all 13 MSI bands as delivered (DN = reflectance × 10 000). Broken cumulus over its
+northern third is what makes it useful: the masking notebook needs cloud to mask.
+
+`data/reef_clear.npy` — a ribbon reef on the outer Great Barrier Reef, same tile,
+2020-05-31, 656×333, same 13-band layout. Chosen for the opposite reason: not one pixel
+crosses the cloud threshold, so the depth machinery can be seen on its own.
+
+All three are regenerated by `data/prepare_data.py` from raw Sentinel-2 products.
+
+## History
+
+This repository previously held ShallowLearn, a ~14 000-line library wrapping satellite IO,
+band mapping, VRT building, feature stacks and visualisation behind a class hierarchy. The
+abstraction obscured methods that are, in the end, forty lines of scikit-learn each, so it
+was removed in favour of the notebooks above. It remains in the git history if you need it,
+and the paper below describes the same methods in their original form.
+
+One implementation detail changed along the way: the library estimated Lyzenga's attenuation
+ratio with an ordinary least squares slope, and the notebooks use the principal-axis
+estimator from Lyzenga's own formulation, fitted per superpixel and taken as a median. On
+this imagery the ratio turns out to be weakly determined either way — the notebook shows
+why, and why the delineation that depends on it is nonetheless stable.
+
+## Citation
+
+Al Zayer, Z., Mason, P., Platt, R., John, C.M. (2025). *An Improved Machine Learning-Based
+Method for Unsupervised Characterisation for Coral Reef Monitoring in Earth Observation
+Time-Series Data.* Remote Sensing 17(7), 1244.
+[mdpi.com/2072-4292/17/7/1244](https://www.mdpi.com/2072-4292/17/7/1244)
+
+MIT licensed.

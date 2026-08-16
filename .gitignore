@@ -1,10 +1,10 @@
 *.pyc
-.coverage
+__pycache__/
 .venv/
 .vscode/
-Data/
-Models/
-creds
-Animations/
-Temp/
-Graphs/
+.ipynb_checkpoints/
+
+# The thesis source (~230 MB of figures) is kept out of git.
+# Note the capitalisation: the directory on disk is PhD_Thesis, so the old
+# "Phd_Thesis/" entry never matched on a case-sensitive filesystem.
+PhD_Thesis/

@@ -1,1 +1,0 @@
-# LoadData module has been deprecated - use ShallowLearn.io.satellite_data instead
