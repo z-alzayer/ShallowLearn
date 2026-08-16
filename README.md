@@ -1,6 +1,6 @@
 # ShallowLearn — unsupervised methods for shallow-water remote sensing
 
-We've simplified this repo in order to enhance readability and accessibility, its contents are all in 3 notebooks with the data required included. Everything should be relatively straightforward to run, if there is anything feel free to let me know by raising an issue.
+We've simplified this repo in order to enhance readability and accessibility, its contents are all in 3 notebooks with the data required included. Everything should be relatively straightforward to run, if there is anything feel free to let me know by raising an issue. If you used the previous packages and setup, you'll need to go back to the prior commits and I would suggest forking from there.
 
 | | | |
 |---|---|---|
